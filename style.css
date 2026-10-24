@@ -1301,7 +1301,7 @@ body.admin-theme .dept-pill {
 
 .filters-row {
   display: grid;
-  grid-template-columns: 2fr 1.2fr 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
   gap: 14px;
   margin-bottom: 14px;
 }
@@ -1396,6 +1396,12 @@ body.admin-theme .dept-pill {
   background: rgba(244, 63, 94, 0.2);
   color: #fda4af;
   border: 1px solid rgba(244, 63, 94, 0.4);
+}
+
+.status-not_required {
+  background: rgba(71, 85, 105, 0.16);
+  color: #94a3b8;
+  border: 1px dashed rgba(148, 163, 184, 0.35);
 }
 
 .crit-badge {

@@ -9,6 +9,7 @@ const VALID_AI_STAGES = [
   'in_progress',
   'not_started',
   'overdue',
+  'not_required',
   'awaiting_docs',
   'sent_to_ai',
   'uploading_nova',

@@ -82,8 +82,9 @@
       </div>
 
       <nav class="main-nav" aria-label="Основная навигация">
-        <button type="button" class="nav-tab active" data-tab="dashboard" data-i18n="navDashboard">Дашборд</button>
-        <button type="button" class="nav-tab" data-tab="tasks" data-i18n="navTasks">Задачи по подразделениям</button>
+        <button type="button" class="nav-tab active" data-tab="dashboard" data-i18n="navDashboard">Дашборд Финблока</button>
+        <button type="button" class="nav-tab" data-tab="ai-dashboard" data-i18n="navAiDashboard">Дашборд AI департамента</button>
+        <button type="button" class="nav-tab" data-tab="tasks" data-i18n="navTasks">Задачи и подразделения</button>
         <button type="button" class="nav-tab hidden" data-tab="admin" id="admin-nav-tab" data-i18n="navAdmin">Админка</button>
       </nav>
 
@@ -222,6 +223,115 @@
         </div>
       </section>
 
+      <!-- ВКЛАДКА 2: ДАШБОРД AI ДЕПАРТАМЕНТА (отдельно от Финблока, без задач со статусом «Не требуется») -->
+      <section id="tab-ai-dashboard" class="tab-pane">
+        <div class="dashboard-top-meta">
+          <button type="button" id="ai-last-updated-btn" class="last-updated-btn" title="Нажмите для синхронизации данных">
+            <span class="pulse-dot"></span>
+            <span data-i18n="lastUpdatedPrefix">Обновление:</span>
+            <strong id="ai-last-updated-time">—</strong>
+          </button>
+        </div>
+
+        <!-- 4 компактные KPI-карточки по задачам AI департамента -->
+        <div class="kpi-grid">
+          <div class="kpi-card kpi-total card-3d">
+            <div class="kpi-top">
+              <span class="kpi-label" data-i18n="aiKpiTotalLabel">Задач в AI департаменте</span>
+              <span class="kpi-icon icon-blue">◈</span>
+            </div>
+            <div class="kpi-main-row">
+              <strong id="ai-kpi-total" class="kpi-value">0</strong>
+              <span id="ai-overall-score-pill" class="kpi-trend trend-neutral">0%</span>
+            </div>
+            <div class="kpi-mini-bar"><div id="ai-kpi-bar-total" class="kpi-mini-fill fill-blue" style="width: 100%"></div></div>
+            <span class="kpi-foot" data-i18n="aiKpiTotalFoot">Задачи с участием AI департамента</span>
+          </div>
+
+          <div class="kpi-card kpi-done card-3d">
+            <div class="kpi-top">
+              <span class="kpi-label" data-i18n="kpiDoneLabel">Выполнено</span>
+              <span class="kpi-icon icon-green">✓</span>
+            </div>
+            <div class="kpi-main-row">
+              <strong id="ai-kpi-done" class="kpi-value">0</strong>
+              <span id="ai-kpi-done-badge" class="kpi-trend trend-up">0%</span>
+            </div>
+            <div class="kpi-mini-bar"><div id="ai-kpi-bar-done" class="kpi-mini-fill fill-green" style="width: 0%"></div></div>
+            <span id="ai-kpi-done-percent" class="kpi-foot">0%</span>
+          </div>
+
+          <div class="kpi-card kpi-progress card-3d">
+            <div class="kpi-top">
+              <span class="kpi-label" data-i18n="kpiProgressLabel">В работе</span>
+              <span class="kpi-icon icon-cyan">⚡</span>
+            </div>
+            <div class="kpi-main-row">
+              <strong id="ai-kpi-in-progress" class="kpi-value">0</strong>
+              <span id="ai-kpi-progress-badge" class="kpi-trend trend-info">0%</span>
+            </div>
+            <div class="kpi-mini-bar"><div id="ai-kpi-bar-progress" class="kpi-mini-fill fill-cyan" style="width: 0%"></div></div>
+            <span class="kpi-foot" data-i18n="kpiProgressFoot">Активная фаза внедрения</span>
+          </div>
+
+          <div class="kpi-card kpi-critical card-3d">
+            <div class="kpi-top">
+              <span class="kpi-label" data-i18n="kpiAttentionLabel">Критичных / Просрочено</span>
+              <span class="kpi-icon icon-red">🔴</span>
+            </div>
+            <div class="kpi-main-row">
+              <strong class="kpi-value"><span id="ai-kpi-critical">0</span> <small style="font-size:1.1rem;color:#94a3b8;font-weight:600;">/ <span id="ai-kpi-overdue">0</span></small></strong>
+            </div>
+            <div class="kpi-mini-bar"><div id="ai-kpi-bar-critical" class="kpi-mini-fill fill-red" style="width: 0%"></div></div>
+            <span class="kpi-foot" data-i18n="kpiOverdueFoot">Контроль приоритетов и сроков</span>
+          </div>
+        </div>
+
+        <!-- График: Разрез подразделений по задачам AI департамента -->
+        <div class="charts-grid single-chart-grid">
+          <div class="chart-card card-3d">
+            <div class="card-header">
+              <div>
+                <span class="panel-eyebrow" data-i18n="chartEyebrowDept">РАЗРЕЗ ПОДРАЗДЕЛЕНИЙ</span>
+                <h3 data-i18n="aiChartDeptTitle">Задачи AI департамента по подразделениям</h3>
+              </div>
+            </div>
+            <div class="chart-box">
+              <canvas id="chart-ai-department"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Блок: Индекс реализации AI департамента -->
+        <div class="bi-panel ai-summary-wide card-3d">
+          <div class="summary-left">
+            <div class="panel-header">
+              <div>
+                <span class="panel-eyebrow" data-i18n="execProgressEyebrow">ИНДЕКС РЕАЛИЗАЦИИ</span>
+                <h3 data-i18n="aiExecProgressTitle">Прогресс выполнения (AI департамент)</h3>
+              </div>
+              <strong id="ai-active-coverage-val" class="score-badge">0%</strong>
+            </div>
+
+            <div class="stacked-progress-track">
+              <div id="ai-stacked-done-bar" class="stacked-segment seg-done" style="width: 0%"></div>
+              <div id="ai-stacked-progress-bar" class="stacked-segment seg-progress" style="width: 0%"></div>
+              <div id="ai-stacked-pending-bar" class="stacked-segment seg-pending" style="width: 0%"></div>
+              <div id="ai-stacked-overdue-bar" class="stacked-segment seg-overdue" style="width: 0%"></div>
+            </div>
+
+            <div class="stacked-legend">
+              <span><i class="dot dot-done"></i> <span data-i18n="kpiDoneLabel">Выполнено</span>: <b id="ai-legend-done-cnt">0</b></span>
+              <span><i class="dot dot-progress"></i> <span data-i18n="kpiProgressLabel">В работе</span>: <b id="ai-legend-prog-cnt">0</b></span>
+              <span><i class="dot dot-pending"></i> <span data-i18n="statusNotStartedShort">Не начато</span>: <b id="ai-legend-wait-cnt">0</b></span>
+              <span><i class="dot dot-overdue"></i> <span data-i18n="kpiOverdueLabel">Просрочено</span>: <b id="ai-legend-overdue-cnt">0</b></span>
+            </div>
+
+            <div id="ai-plan-fact-list" class="plan-fact-list compact-pf"></div>
+          </div>
+        </div>
+      </section>
+
       <!-- ВКЛАДКА 2: ЗАДАЧИ И ПОДРАЗДЕЛЕНИЯ (ОБЪЕДИНЁННАЯ) -->
       <section id="tab-tasks" class="tab-pane">
         <div class="toolbar-card card-3d">
@@ -239,13 +349,25 @@
             </div>
 
             <div class="filter-item">
-              <label for="filter-status" data-i18n="filterStatusLabel">Статус подразделения Финблока</label>
+              <label for="filter-status" data-i18n="thStatus">Статус подразделения Финблока</label>
               <select id="filter-status">
                 <option value="ALL" data-i18n="filterAllStatuses">Все статусы</option>
                 <option value="done" data-status-opt="done">Выполнено</option>
                 <option value="in_progress" data-status-opt="in_progress">В работе</option>
                 <option value="not_started" data-status-opt="not_started">Не начата</option>
                 <option value="overdue" data-status-opt="overdue">Просрочена</option>
+              </select>
+            </div>
+
+            <div class="filter-item">
+              <label for="filter-ai-stage" data-i18n="thAiProcess">Статус AI департамента</label>
+              <select id="filter-ai-stage">
+                <option value="ALL" data-i18n="filterAllStatuses">Все статусы</option>
+                <option value="done" data-status-opt="done">Выполнено</option>
+                <option value="in_progress" data-status-opt="in_progress">В работе</option>
+                <option value="not_started" data-status-opt="not_started">Не начата</option>
+                <option value="overdue" data-status-opt="overdue">Просрочена</option>
+                <option value="not_required" data-status-opt="not_required">Не требуется</option>
               </select>
             </div>
 
@@ -445,6 +567,7 @@
             <option value="in_progress" data-status-opt="in_progress">В работе</option>
             <option value="done" data-status-opt="done">Выполнено</option>
             <option value="overdue" data-status-opt="overdue">Просрочена</option>
+            <option value="not_required" data-status-opt="not_required">Не требуется</option>
           </select>
         </div>
 

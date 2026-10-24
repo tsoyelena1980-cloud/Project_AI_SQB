@@ -16,7 +16,8 @@ const I18N = {
     demoAccountsTitle: 'Тестовые доступы (после запуска сида):',
     appHeaderTitle: 'Трекер внедрения AI — Финблок SQB',
     appHeaderSub: 'Актуальность трекинга: октябрь 2026',
-    navDashboard: 'Дашборд',
+    navDashboard: 'Дашборд Финблока',
+    navAiDashboard: 'Дашборд AI департамента',
     navTasks: 'Задачи и подразделения',
     navAdmin: 'Админка',
     btnLogout: 'Выйти',
@@ -24,8 +25,12 @@ const I18N = {
     roleAdminBadge: 'РЕЖИМ АДМИНИСТРАТОРА',
     roleAdminSub: 'Полный доступ к управлению',
     roleUserBadge: 'РЕЖИМ ПОЛЬЗОВАТЕЛЯ',
-    kpiTotalLabel: 'Всего задач',
+    kpiTotalLabel: 'Всего задач (Финблок)',
     kpiTotalFoot: 'По 5 подразделениям Финблока',
+    aiKpiTotalLabel: 'Задач в AI департаменте',
+    aiKpiTotalFoot: 'Задачи с участием AI департамента (без «Не требуется»)',
+    aiChartDeptTitle: 'Задачи AI департамента по подразделениям',
+    aiExecProgressTitle: 'Прогресс выполнения (AI департамент)',
     kpiDoneLabel: 'Выполнено',
     kpiPercentOfTotal: '% от общего объёма',
     kpiProgressLabel: 'В работе',
@@ -146,7 +151,8 @@ const I18N = {
       done: 'Выполнено',
       in_progress: 'В работе',
       not_started: 'Не начата',
-      overdue: 'Просрочена'
+      overdue: 'Просрочена',
+      not_required: 'Не требуется'
     },
     criticalities: {
       red: 'Высокая',
@@ -179,7 +185,8 @@ const I18N = {
     demoAccountsTitle: 'Demo accounts (after running seed):',
     appHeaderTitle: 'AI Implementation Tracker — SQB Finblock',
     appHeaderSub: 'Tracking period: October 2026',
-    navDashboard: 'Dashboard',
+    navDashboard: 'Finblock Dashboard',
+    navAiDashboard: 'AI Department Dashboard',
     navTasks: 'Tasks & Divisions',
     navAdmin: 'Admin Panel',
     btnLogout: 'Sign Out',
@@ -187,8 +194,12 @@ const I18N = {
     roleAdminBadge: 'ADMINISTRATOR MODE',
     roleAdminSub: 'Full management access',
     roleUserBadge: 'USER MODE',
-    kpiTotalLabel: 'Total Tasks',
+    kpiTotalLabel: 'Total Tasks (Finblock)',
     kpiTotalFoot: 'Across 5 Finblock divisions',
+    aiKpiTotalLabel: 'AI Department Tasks',
+    aiKpiTotalFoot: 'Tasks involving AI Department (excl. Not Required)',
+    aiChartDeptTitle: 'AI Department Tasks by Division',
+    aiExecProgressTitle: 'Execution Progress (AI Department)',
     kpiDoneLabel: 'Completed',
     kpiPercentOfTotal: '% of total volume',
     kpiProgressLabel: 'In Progress',
@@ -309,7 +320,8 @@ const I18N = {
       done: 'Completed',
       in_progress: 'In Progress',
       not_started: 'Not Started',
-      overdue: 'Overdue'
+      overdue: 'Overdue',
+      not_required: 'Not Required'
     },
     criticalities: {
       red: 'High',
@@ -342,7 +354,8 @@ const I18N = {
     demoAccountsTitle: 'Test hisoblari (seed ishga tushirilgandan so‘ng):',
     appHeaderTitle: 'AI joriy etish trekeri — SQB Moliya bloki',
     appHeaderSub: 'Treking holati: 2026-yil oktabr',
-    navDashboard: 'Dashbord',
+    navDashboard: 'Moliya bloki dashbordi',
+    navAiDashboard: 'AI departamenti dashbordi',
     navTasks: 'Vazifalar va bo‘linmalar',
     navAdmin: 'Admin panel',
     btnLogout: 'Chiqish',
@@ -350,8 +363,12 @@ const I18N = {
     roleAdminBadge: 'ADMINISTRATOR REJIMI',
     roleAdminSub: 'Boshqaruvga to‘liq ruxsat',
     roleUserBadge: 'FOYDALANUVCHI REJIMI',
-    kpiTotalLabel: 'Jami vazifalar',
+    kpiTotalLabel: 'Jami vazifalar (Moliya bloki)',
     kpiTotalFoot: 'Moliya blokining 5 ta bo‘linmasi bo‘yicha',
+    aiKpiTotalLabel: 'AI departamenti vazifalari',
+    aiKpiTotalFoot: 'AI departamenti ishtirokidagi vazifalar',
+    aiChartDeptTitle: 'Bo‘linmalar bo‘yicha AI departamenti vazifalari',
+    aiExecProgressTitle: 'Bajarilish jarayoni (AI departamenti)',
     kpiDoneLabel: 'Bajarildi',
     kpiPercentOfTotal: '% umumiy hajmdan',
     kpiProgressLabel: 'Jarayonda',
@@ -472,7 +489,8 @@ const I18N = {
       done: 'Bajarildi',
       in_progress: 'Jarayonda',
       not_started: 'Boshlanmagan',
-      overdue: 'Muddati o‘tgan'
+      overdue: 'Muddati o‘tgan',
+      not_required: 'Talab etilmaydi'
     },
     criticalities: {
       red: 'Yuqori',
@@ -806,9 +824,9 @@ const INITIAL_SEED_TASKS = [
 ];
 
 const ADMIN_EMAIL = 'tsoyelena1980@gmail.com';
-const AI_STAGE_ORDER = ['done', 'in_progress', 'not_started', 'overdue'];
+const AI_STAGE_ORDER = ['done', 'in_progress', 'not_started', 'overdue', 'not_required'];
 
-// Определение статуса AI департамента (выполнено, в работе, не начата, просрочена)
+// Определение статуса AI департамента (выполнено, в работе, не начата, просрочена, не требуется)
 function resolveTaskAiStage(task) {
   if (task.ai_stage && AI_STAGE_ORDER.includes(task.ai_stage)) {
     return task.ai_stage;
@@ -817,9 +835,18 @@ function resolveTaskAiStage(task) {
   if (task.ai_stage === 'completed_ai') return 'done';
   if (['sent_to_ai', 'uploading_nova', 'testing_nova'].includes(task.ai_stage)) return 'in_progress';
   if (task.ai_stage === 'overdue_ai') return 'overdue';
-  if (task.ai_stage === 'awaiting_docs') return 'not_started';
 
   const raw = `${task.title || ''} ${task.note || ''} ${task.fact_info || ''}`.toLowerCase();
+  // Задачи Финблока, не требующие участия AI департамента (расчёт эффективности, рапорты, обзвон клиентов и т.д.)
+  if (
+    raw.includes('расчёта эффективности') ||
+    raw.includes('эффективность внедрения') ||
+    raw.includes('подготовить рапорт') ||
+    raw.includes('обзвона клиентов')
+  ) {
+    return 'not_required';
+  }
+  if (task.ai_stage === 'awaiting_docs') return 'not_started';
   // Если документы переданы в AI департамент или идут тесты — для AI департамента задача «В работе»
   if (raw.includes('направлено в ai департамент') || raw.includes('тестирование') || raw.includes('83 вопроса')) {
     return 'in_progress';
@@ -1296,7 +1323,8 @@ const STATUS_ICONS = {
   done: '✓',
   in_progress: '⚡',
   not_started: '○',
-  overdue: '◷'
+  overdue: '◷',
+  not_required: '—'
 };
 
 // Отображение ячейки «Критичность»: выпадающий список ТОЛЬКО для администратора, статичный бейдж для пользователей
@@ -1356,6 +1384,7 @@ function renderAiPipelineCell(task) {
       <option value="in_progress" ${stage === 'in_progress' ? 'selected' : ''}>⚡ ${statusLabels.in_progress}</option>
       <option value="not_started" ${stage === 'not_started' ? 'selected' : ''}>○ ${statusLabels.not_started}</option>
       <option value="overdue" ${stage === 'overdue' ? 'selected' : ''}>◷ ${statusLabels.overdue}</option>
+      <option value="not_required" ${stage === 'not_required' ? 'selected' : ''}>— ${statusLabels.not_required}</option>
     </select>
   `;
 }
@@ -1579,6 +1608,173 @@ function renderDashboard() {
       }
     });
   }
+
+  // Отрисовка отдельного дашборда по задачам AI департамента (без включения их в Финблок)
+  renderAiDashboard();
+}
+
+// Отдельный дашборд по задачам AI департамента (учитываются только задачи, где Статус AI департамента !== 'not_required')
+function renderAiDashboard() {
+  const aiLastUpdatedEl = document.getElementById('ai-last-updated-time');
+  if (aiLastUpdatedEl) {
+    aiLastUpdatedEl.textContent = formatTashkentDateTime(state.lastModifiedAt);
+  }
+
+  const aiTasks = state.tasks.filter((task) => resolveTaskAiStage(task) !== 'not_required');
+  const total = aiTasks.length;
+  const doneCount = aiTasks.filter((task) => resolveTaskAiStage(task) === 'done').length;
+  const inProgressCount = aiTasks.filter((task) => resolveTaskAiStage(task) === 'in_progress').length;
+  const notStartedCount = aiTasks.filter((task) => resolveTaskAiStage(task) === 'not_started').length;
+  const overdueCount = aiTasks.filter((task) => resolveTaskAiStage(task) === 'overdue').length;
+  const criticalCount = aiTasks.filter((task) => task.criticality === 'red').length;
+
+  const donePct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+  const progPct = total > 0 ? Math.round((inProgressCount / total) * 100) : 0;
+  const notStartedPct = total > 0 ? Math.round((notStartedCount / total) * 100) : 0;
+  const overPct = total > 0 ? Math.round((overdueCount / total) * 100) : 0;
+  const critPct = total > 0 ? Math.round((criticalCount / total) * 100) : 0;
+  const activeCoveragePct = total > 0 ? Math.round(((doneCount + inProgressCount) / total) * 100) : 0;
+
+  const setElText = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  };
+  const setElWidth = (id, pctVal) => {
+    const el = document.getElementById(id);
+    if (el) el.style.width = `${Math.min(100, Math.max(0, pctVal))}%`;
+  };
+
+  setElText('ai-kpi-total', total);
+  setElText('ai-overall-score-pill', `${donePct}% DONE`);
+  setElText('ai-kpi-done', doneCount);
+  setElText('ai-kpi-done-badge', `${donePct}%`);
+  setElText('ai-kpi-done-percent', `${donePct}${t('kpiPercentOfTotal')}`);
+  setElText('ai-kpi-in-progress', inProgressCount);
+  setElText('ai-kpi-progress-badge', `${progPct}%`);
+  setElText('ai-kpi-critical', criticalCount);
+  setElText('ai-kpi-overdue', overdueCount);
+
+  setElWidth('ai-kpi-bar-done', donePct);
+  setElWidth('ai-kpi-bar-progress', progPct);
+  setElWidth('ai-kpi-bar-critical', critPct);
+
+  setElText('ai-active-coverage-val', `${activeCoveragePct}% (${doneCount + inProgressCount}/${total})`);
+  setElWidth('ai-stacked-done-bar', donePct);
+  setElWidth('ai-stacked-progress-bar', progPct);
+  setElWidth('ai-stacked-pending-bar', notStartedPct);
+  setElWidth('ai-stacked-overdue-bar', overPct);
+
+  setElText('ai-legend-done-cnt', doneCount);
+  setElText('ai-legend-prog-cnt', inProgressCount);
+  setElText('ai-legend-wait-cnt', notStartedCount);
+  setElText('ai-legend-overdue-cnt', overdueCount);
+
+  const deptNames = I18N[state.lang].departments;
+  const deptKeys = Object.keys(deptNames);
+
+  const aiPfListEl = document.getElementById('ai-plan-fact-list');
+  if (aiPfListEl) {
+    aiPfListEl.innerHTML = deptKeys
+      .map((k) => {
+        const dTasks = aiTasks.filter((task) => task.department === k);
+        const dPlan = dTasks.length;
+        const dFact = dTasks.filter((task) => resolveTaskAiStage(task) === 'done').length;
+        const dActive = dTasks.filter((task) => resolveTaskAiStage(task) === 'in_progress').length;
+        const dNotStarted = dTasks.filter((task) => resolveTaskAiStage(task) === 'not_started').length;
+        const dOverdue = dTasks.filter((task) => resolveTaskAiStage(task) === 'overdue').length;
+
+        const dFactPct = dPlan > 0 ? Math.round((dFact / dPlan) * 100) : 0;
+        const dActivePct = dPlan > 0 ? Math.round((dActive / dPlan) * 100) : 0;
+        const dNotStartedPct = dPlan > 0 ? Math.round((dNotStarted / dPlan) * 100) : 0;
+        const dOverduePct = dPlan > 0 ? Math.round((dOverdue / dPlan) * 100) : 0;
+
+        return `
+          <div class="pf-row">
+            <div class="pf-top">
+              <span class="pf-dept">${deptNames[k]}</span>
+              <span class="pf-numbers">
+                ${t('chartDoneSeries')}: <strong>${dFact}</strong> ·
+                ${t('chartPendingSeries')}: <b style="color:#c084fc;">${dActive}</b> ·
+                ${t('chartNotStartedSeries')}: <b style="color:#94a3b8;">${dNotStarted}</b> ·
+                ${t('chartOverdueSeries')}: <b style="color:#fb7185;">${dOverdue}</b>
+              </span>
+            </div>
+            <div class="pf-bar-bg">
+              <div class="pf-bar-done" style="width: ${dFactPct}%"></div>
+              <div class="pf-bar-active" style="width: ${dActivePct}%"></div>
+              <div class="pf-bar-pending" style="width: ${dNotStartedPct}%"></div>
+              <div class="pf-bar-overdue" style="width: ${dOverduePct}%"></div>
+            </div>
+          </div>
+        `;
+      })
+      .join('');
+  }
+
+  const isAdminTheme = isCurrentUserAdmin();
+  const barInProgressColor = isAdminTheme ? '#9333ea' : '#2563eb';
+
+  const aiDeptDone = deptKeys.map(
+    (k) => aiTasks.filter((task) => task.department === k && resolveTaskAiStage(task) === 'done').length
+  );
+  const aiDeptInProgress = deptKeys.map(
+    (k) => aiTasks.filter((task) => task.department === k && resolveTaskAiStage(task) === 'in_progress').length
+  );
+  const aiDeptNotStarted = deptKeys.map(
+    (k) => aiTasks.filter((task) => task.department === k && resolveTaskAiStage(task) === 'not_started').length
+  );
+  const aiDeptOverdue = deptKeys.map(
+    (k) => aiTasks.filter((task) => task.department === k && resolveTaskAiStage(task) === 'overdue').length
+  );
+
+  const aiDeptCanvas = document.getElementById('chart-ai-department');
+  if (aiDeptCanvas) {
+    const aiDeptCtx = aiDeptCanvas.getContext('2d');
+    if (state.charts.aiDepartment) state.charts.aiDepartment.destroy();
+    state.charts.aiDepartment = new Chart(aiDeptCtx, {
+      type: 'bar',
+      data: {
+        labels: deptKeys.map((k) => deptNames[k]),
+        datasets: [
+          {
+            label: t('chartDoneSeries'),
+            data: aiDeptDone,
+            backgroundColor: '#10b981',
+            borderRadius: 6
+          },
+          {
+            label: t('chartPendingSeries'),
+            data: aiDeptInProgress,
+            backgroundColor: barInProgressColor,
+            borderRadius: 6
+          },
+          {
+            label: t('chartNotStartedSeries'),
+            data: aiDeptNotStarted,
+            backgroundColor: '#64748b',
+            borderRadius: 6
+          },
+          {
+            label: t('chartOverdueSeries'),
+            data: aiDeptOverdue,
+            backgroundColor: '#f43f5e',
+            borderRadius: 6
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { stacked: true, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(36, 50, 79, 0.35)' } },
+          y: { stacked: true, beginAtZero: true, ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: 'rgba(36, 50, 79, 0.35)' } }
+        },
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#cbd5e1', padding: 14, usePointStyle: true } }
+        }
+      }
+    });
+  }
 }
 
 // Отрисовка основной таблицы задач с учётом фильтров и выбранного языка
@@ -1586,6 +1782,8 @@ function renderTasksTable() {
   const search = document.getElementById('filter-search').value.trim().toLowerCase();
   const dept = document.getElementById('filter-department').value;
   const status = document.getElementById('filter-status').value;
+  const aiStageEl = document.getElementById('filter-ai-stage');
+  const aiStageFilter = aiStageEl ? aiStageEl.value : 'ALL';
   const crit = document.getElementById('filter-criticality').value;
 
   const isAdmin = isCurrentUserAdmin();
@@ -1598,6 +1796,7 @@ function renderTasksTable() {
   const filtered = state.tasks.filter((task) => {
     if (dept !== 'ALL' && task.department !== dept) return false;
     if (status !== 'ALL' && task.status !== status) return false;
+    if (aiStageFilter !== 'ALL' && resolveTaskAiStage(task) !== aiStageFilter) return false;
     if (crit !== 'ALL' && task.criticality !== crit) return false;
     if (search) {
       const loc = getLocalizedTaskFields(task);
@@ -1937,15 +2136,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  const aiLastUpdatedBtn = document.getElementById('ai-last-updated-btn');
+  if (aiLastUpdatedBtn) {
+    aiLastUpdatedBtn.addEventListener('click', async () => {
+      await loadAllData();
+      showToast(t('toastSynced'));
+    });
+  }
+
   // Навигация по вкладкам
   document.querySelectorAll('.nav-tab').forEach((btn) => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
 
-  // Фильтры задач и подразделений
-  ['filter-search', 'filter-department', 'filter-status', 'filter-criticality'].forEach((id) => {
-    document.getElementById(id).addEventListener('input', renderTasksTable);
-    document.getElementById(id).addEventListener('change', renderTasksTable);
+  // Фильтры задач и подразделений (включая фильтр по статусу AI департамента)
+  ['filter-search', 'filter-department', 'filter-status', 'filter-ai-stage', 'filter-criticality'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', renderTasksTable);
+    el.addEventListener('change', renderTasksTable);
   });
 
   // Кнопка создания задачи (доступна только администратору)
