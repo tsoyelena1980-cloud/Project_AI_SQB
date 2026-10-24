@@ -1,0 +1,16 @@
+{
+  "name": "sqb-ai-task-tracker",
+  "version": "1.0.0",
+  "description": "Трекер задач по внедрению AI в Финблоке SQB",
+  "main": "index.html",
+  "scripts": {
+    "seed": "node seed.js",
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

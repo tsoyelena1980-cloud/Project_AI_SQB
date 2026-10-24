@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Трекер задач по внедрению AI в Финблоке SQB</title>
+  <!-- Подключение шрифта Inter и библиотеки Chart.js -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Декоративное фоновое свечение премиальной BI-системы -->
+  <div class="ambient-glow glow-1" aria-hidden="true"></div>
+  <div class="ambient-glow glow-2" aria-hidden="true"></div>
+
+  <!-- Экран аутентификации (Вход / Регистрация) -->
+  <section id="auth-screen" class="auth-wrapper">
+    <div class="auth-card card-3d">
+      <div class="auth-top-row">
+        <div class="auth-brand">
+          <div class="brand-logo">SQB</div>
+          <div>
+            <h1 data-i18n="authTitle">AI Трекер Финблока</h1>
+            <p data-i18n="authSubtitle">Мониторинг внедрения AI-инициатив в подразделениях SQB</p>
+          </div>
+        </div>
+
+        <!-- Переключатель языка на экране входа -->
+        <div class="lang-switcher" aria-label="Выбор языка">
+          <button type="button" class="lang-btn active" data-lang="ru">RU</button>
+          <button type="button" class="lang-btn" data-lang="en">EN</button>
+          <button type="button" class="lang-btn" data-lang="uz">UZ</button>
+        </div>
+      </div>
+
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab active" data-auth-mode="login" data-i18n="loginTab">Вход в систему</button>
+        <button type="button" class="auth-tab" data-auth-mode="register" data-i18n="registerTab">Регистрация</button>
+      </div>
+
+      <form id="auth-form" class="auth-form">
+        <div id="register-name-group" class="form-group hidden">
+          <label for="auth-name" data-i18n="labelName">ФИО / Подразделение</label>
+          <input type="text" id="auth-name" data-i18n-placeholder="placeholderName" placeholder="Например: Алиев Рустам (ДБУ)" />
+        </div>
+
+        <div class="form-group">
+          <label for="auth-email" data-i18n="labelEmail">Email (любой почтовый сервис)</label>
+          <input type="email" id="auth-email" required placeholder="example@gmail.com" />
+        </div>
+
+        <div class="form-group">
+          <label for="auth-password" data-i18n="labelPassword">Пароль</label>
+          <input type="password" id="auth-password" required placeholder="••••••••" />
+        </div>
+
+        <div id="auth-error" class="alert-error hidden"></div>
+
+        <button type="submit" id="auth-submit-btn" class="btn btn-primary btn-block" data-i18n="btnLoginSubmit">
+          Войти в трекер
+        </button>
+      </form>
+    </div>
+  </section>
+
+  <!-- Основной интерфейс приложения -->
+  <div id="app-shell" class="app-shell hidden">
+    <!-- Верхняя шапка и навигация -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand-logo small">SQB</div>
+        <div>
+          <div class="title-row">
+            <h2 class="app-title" data-i18n="appHeaderTitle">Трекер внедрения AI — Финблок SQB</h2>
+            <span class="bi-tag">BI EXECUTIVE</span>
+          </div>
+          <span class="app-subtitle" data-i18n="appHeaderSub">Актуальность трекинга: октябрь 2026</span>
+        </div>
+      </div>
+
+      <nav class="main-nav" aria-label="Основная навигация">
+        <button type="button" class="nav-tab active" data-tab="dashboard" data-i18n="navDashboard">Дашборд</button>
+        <button type="button" class="nav-tab" data-tab="tasks" data-i18n="navTasks">Задачи по подразделениям</button>
+        <button type="button" class="nav-tab hidden" data-tab="admin" id="admin-nav-tab" data-i18n="navAdmin">Админка</button>
+      </nav>
+
+      <div class="topbar-right">
+        <!-- Переключатель языка в шапке приложения -->
+        <div class="lang-switcher" aria-label="Выбор языка">
+          <button type="button" class="lang-btn active" data-lang="ru">RU</button>
+          <button type="button" class="lang-btn" data-lang="en">EN</button>
+          <button type="button" class="lang-btn" data-lang="uz">UZ</button>
+        </div>
+
+        <div id="user-role-indicator" class="user-badge badge-user">
+          <div id="current-user-icon" class="user-role-icon" aria-hidden="true"></div>
+          <div class="user-badge-info">
+            <div class="user-badge-top">
+              <span id="current-user-role" class="role-pill role-user">РЕЖИМ ПОЛЬЗОВАТЕЛЯ</span>
+              <span id="current-user-name" class="user-name">Пользователь</span>
+            </div>
+            <span id="current-user-sub" class="user-role-sub hidden">Полный доступ к управлению</span>
+          </div>
+        </div>
+        <button type="button" id="refresh-data-btn" class="btn btn-ghost" title="Sync">↻</button>
+        <button type="button" id="logout-btn" class="btn btn-outline" data-i18n="btnLogout">Выйти</button>
+      </div>
+    </header>
+
+    <!-- Контейнер вкладок с плавными CSS-переходами -->
+    <main class="main-content">
+      <!-- ВКЛАДКА 1: ДАШБОРД (компактный и визуально чистый вид на один экран) -->
+      <section id="tab-dashboard" class="tab-pane active">
+        <!-- Верхняя строка дашборда с кнопкой даты и времени последнего изменения администратором -->
+        <div class="dashboard-top-meta">
+          <button type="button" id="last-updated-btn" class="last-updated-btn" title="Нажмите для синхронизации данных">
+            <span class="pulse-dot"></span>
+            <span data-i18n="lastUpdatedPrefix">Обновление:</span>
+            <strong id="last-updated-time">—</strong>
+          </button>
+        </div>
+
+        <!-- 4 компактные KPI-карточки -->
+        <div class="kpi-grid">
+          <div class="kpi-card kpi-total card-3d">
+            <div class="kpi-top">
+              <span class="kpi-label" data-i18n="kpiTotalLabel">Всего задач (План)</span>
+              <span class="kpi-icon icon-blue">◈</span>
+            </div>
+            <div class="kpi-main-row">
+              <strong id="kpi-total" class="kpi-value">0</strong>
+              <span id="overall-score-pill" class="kpi-trend trend-neutral">0%</span>
+            </div>
+            <div class="kpi-mini-bar"><div id="kpi-bar-total" class="kpi-mini-fill fill-blue" style="width: 100%"></div></div>
+            <span class="kpi-foot" data-i18n="kpiTotalFoot">По 5 подразделениям Финблока</span>
+          </div>
+
+          <div class="kpi-card kpi-done card-3d">
+            <div class="kpi-top">
+              <span class="kpi-label" data-i18n="kpiDoneLabel">Выполнено (Факт)</span>
+              <span class="kpi-icon icon-green">✓</span>
+            </div>
+            <div class="kpi-main-row">
+              <strong id="kpi-done" class="kpi-value">0</strong>
+              <span id="kpi-done-badge" class="kpi-trend trend-up">0%</span>
+            </div>
+            <div class="kpi-mini-bar"><div id="kpi-bar-done" class="kpi-mini-fill fill-green" style="width: 0%"></div></div>
+            <span id="kpi-done-percent" class="kpi-foot">0%</span>
+          </div>
+
+          <div class="kpi-card kpi-progress card-3d">
+            <div class="kpi-top">
+              <span class="kpi-label" data-i18n="kpiProgressLabel">В работе</span>
+              <span class="kpi-icon icon-cyan">⚡</span>
+            </div>
+            <div class="kpi-main-row">
+              <strong id="kpi-in-progress" class="kpi-value">0</strong>
+              <span id="kpi-progress-badge" class="kpi-trend trend-info">0%</span>
+            </div>
+            <div class="kpi-mini-bar"><div id="kpi-bar-progress" class="kpi-mini-fill fill-cyan" style="width: 0%"></div></div>
+            <span class="kpi-foot" data-i18n="kpiProgressFoot">Активная фаза внедрения</span>
+          </div>
+
+          <div class="kpi-card kpi-critical card-3d">
+            <div class="kpi-top">
+              <span class="kpi-label" data-i18n="kpiAttentionLabel">Критичных / Просрочено</span>
+              <span class="kpi-icon icon-red">🔴</span>
+            </div>
+            <div class="kpi-main-row">
+              <strong class="kpi-value"><span id="kpi-critical">0</span> <small style="font-size:1.1rem;color:#94a3b8;font-weight:600;">/ <span id="kpi-overdue">0</span></small></strong>
+            </div>
+            <div class="kpi-mini-bar"><div id="kpi-bar-critical" class="kpi-mini-fill fill-red" style="width: 0%"></div></div>
+            <span class="kpi-foot" data-i18n="kpiOverdueFoot">Контроль приоритетов и сроков</span>
+          </div>
+        </div>
+
+        <!-- 2 главных графика в один ряд -->
+        <div class="charts-grid">
+          <div class="chart-card card-3d">
+            <div class="card-header">
+              <div>
+                <span class="panel-eyebrow" data-i18n="chartEyebrowDept">ПЛАН / ФАКТ ПО ПОДРАЗДЕЛЕНИЯМ</span>
+                <h3 data-i18n="chartDeptTitle">Задачи по подразделениям Финблока</h3>
+              </div>
+            </div>
+            <div class="chart-box">
+              <canvas id="chart-department"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card card-3d">
+            <div class="card-header">
+              <div>
+                <span class="panel-eyebrow" data-i18n="chartEyebrowStatus">СТАТУСЫ И ПРОГРЕСС</span>
+                <h3 data-i18n="chartStatusTitle">Распределение по статусам</h3>
+              </div>
+            </div>
+            <div class="chart-box">
+              <canvas id="chart-status"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Компактный блок: Общий прогресс и План / Факт по подразделениям -->
+        <div class="bi-panel ai-summary-wide card-3d">
+          <div class="summary-left">
+            <div class="panel-header">
+              <div>
+                <span class="panel-eyebrow" data-i18n="execProgressEyebrow">ИНДЕКС РЕАЛИЗАЦИИ</span>
+                <h3 data-i18n="execProgressTitle">Общий прогресс и План / Факт</h3>
+              </div>
+              <strong id="active-coverage-val" class="score-badge">0%</strong>
+            </div>
+
+            <div class="stacked-progress-track">
+              <div id="stacked-done-bar" class="stacked-segment seg-done" style="width: 0%"></div>
+              <div id="stacked-progress-bar" class="stacked-segment seg-progress" style="width: 0%"></div>
+            </div>
+
+            <div class="stacked-legend">
+              <span><i class="dot dot-done"></i> <span data-i18n="kpiDoneLabel">Выполнено</span>: <b id="legend-done-cnt">0</b></span>
+              <span><i class="dot dot-progress"></i> <span data-i18n="kpiProgressLabel">В работе</span>: <b id="legend-prog-cnt">0</b></span>
+              <span><i class="dot dot-pending"></i> <span data-i18n="statusPendingShort">Ожидает</span>: <b id="legend-wait-cnt">0</b></span>
+            </div>
+
+            <div id="plan-fact-list" class="plan-fact-list compact-pf"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ВКЛАДКА 2: ЗАДАЧИ И ПОДРАЗДЕЛЕНИЯ (ОБЪЕДИНЁННАЯ) -->
+      <section id="tab-tasks" class="tab-pane">
+        <div class="toolbar-card card-3d">
+          <div class="filters-row">
+            <div class="filter-item">
+              <label for="filter-department" data-i18n="deptFilterSelectLabel">Выберите подразделение Финблока</label>
+              <select id="filter-department">
+                <option value="ALL" data-i18n="deptShowAllOption">Показать все подразделения</option>
+                <option value="AI_FM" data-dept-opt="AI_FM">ФМ</option>
+                <option value="DBU" data-dept-opt="DBU">ДБУ</option>
+                <option value="MSFO" data-dept-opt="MSFO">МСФО</option>
+                <option value="ZAKUPKI" data-dept-opt="ZAKUPKI">Закупки</option>
+                <option value="ALM" data-dept-opt="ALM">ALM</option>
+              </select>
+            </div>
+
+            <div class="filter-item">
+              <label for="filter-status" data-i18n="filterStatusLabel">Статус подразделения Финблока</label>
+              <select id="filter-status">
+                <option value="ALL" data-i18n="filterAllStatuses">Все статусы</option>
+                <option value="done" data-status-opt="done">Выполнено</option>
+                <option value="in_progress" data-status-opt="in_progress">В работе</option>
+                <option value="not_started" data-status-opt="not_started">Не начата</option>
+                <option value="overdue" data-status-opt="overdue">Просрочена</option>
+              </select>
+            </div>
+
+            <div class="filter-item">
+              <label for="filter-criticality" data-i18n="filterCritLabel">Критичность</label>
+              <select id="filter-criticality">
+                <option value="ALL" data-i18n="filterAllCrits">Любая критичность</option>
+                <option value="red" data-crit-opt="red">🔴 Высокая (Red)</option>
+                <option value="yellow" data-crit-opt="yellow">🟡 Средняя (Yellow)</option>
+                <option value="green" data-crit-opt="green">🟢 Низкая (Green)</option>
+              </select>
+            </div>
+
+            <div class="filter-item">
+              <label for="filter-search" data-i18n="filterSearchLabel">Поиск по задаче / примечанию</label>
+              <input type="search" id="filter-search" data-i18n-placeholder="filterSearchPlaceholder" placeholder="Например: NOVA, токены, отчёты..." />
+            </div>
+          </div>
+
+          <div class="toolbar-actions">
+            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;flex:1;">
+              <span id="tasks-counter" class="counter-label">Найдено: 0</span>
+              <div style="flex:1;max-width:320px;display:flex;align-items:center;gap:10px;">
+                <div class="dept-progress-bar" style="margin-bottom:0;height:7px;">
+                  <div id="filtered-dept-progress" class="dept-progress-fill" style="width: 0%"></div>
+                </div>
+                <span id="filtered-dept-pct" class="score-badge" style="font-size:0.74rem;padding:2px 8px;">0%</span>
+              </div>
+            </div>
+            <button type="button" id="add-task-btn" class="btn btn-primary hidden" data-i18n="btnAddTask">
+              + Добавить задачу
+            </button>
+          </div>
+        </div>
+
+        <div class="table-card card-3d">
+          <div class="table-responsive">
+            <table class="tasks-table">
+              <thead>
+                <tr>
+                  <th>№</th>
+                  <th data-i18n="thCriticality">Критичность</th>
+                  <th data-i18n="thDepartment">Подразделение</th>
+                  <th data-i18n="thTask">Задача</th>
+                  <th data-i18n="thDueDate">Срок завершения</th>
+                  <th data-i18n="thFact">Факт / продление</th>
+                  <th data-i18n="thStatus">Статус подразделения Финблока</th>
+                  <th data-i18n="thAiProcess">Статус AI департамента</th>
+                  <th data-i18n="thNote">Примечание</th>
+                  <th id="th-actions" class="hidden" data-i18n="thActions">Действия</th>
+                </tr>
+              </thead>
+              <tbody id="tasks-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ВКЛАДКА 4: АДМИНКА -->
+      <section id="tab-admin" class="tab-pane">
+        <div id="admin-readonly-notice" class="notice-banner card-3d hidden">
+          <h3 data-i18n="readonlyTitle">Режим просмотра (Read-Only)</h3>
+          <p data-i18n="readonlyDesc">
+            Вы вошли с ролью Обычный пользователь. Создание, редактирование, удаление задач и изменение индикатора
+            критичности (🔴 / 🟡 / 🟢) доступны только администратору (tsoyelena1980@gmail.com).
+          </p>
+        </div>
+
+        <div id="admin-panel-content" class="admin-grid hidden">
+          <div class="admin-card card-3d">
+            <div class="card-header">
+              <h3 data-i18n="adminCritTitle">Быстрое управление критичностью задач (🔴 / 🟡 / 🟢)</h3>
+              <p class="card-sub" data-i18n="adminCritSub">Мгновенная раскраска приоритетов администратором с сохранением в Neon PostgreSQL</p>
+            </div>
+            <div id="admin-quick-criticality-list" class="quick-crit-list"></div>
+          </div>
+
+          <div class="admin-card card-3d">
+            <div class="card-header">
+              <h3 data-i18n="adminUsersTitle">Пользователи и ролевой доступ</h3>
+              <p class="card-sub" data-i18n="adminUsersSub">Полные права (CRUD) закреплены за tsoyelena1980@gmail.com, остальные — Read-Only</p>
+            </div>
+            <div class="table-responsive">
+              <table class="tasks-table compact">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th data-i18n="thUserName">Имя</th>
+                    <th>Email</th>
+                    <th data-i18n="thUserRole">Роль</th>
+                    <th data-i18n="thLastLogin">Последний вход (Ташкент)</th>
+                    <th data-i18n="thUserAccess">Уровень доступа</th>
+                  </tr>
+                </thead>
+                <tbody id="users-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="admin-card admin-card-full card-3d">
+            <div class="card-header">
+              <h3 data-i18n="adminHistoryTitle">Журнал входов в систему (Ташкентское время, UTC+5)</h3>
+              <p class="card-sub" data-i18n="adminHistorySub">Полная история авторизаций и регистраций пользователей с точным временем по Ташкенту</p>
+            </div>
+            <div class="table-responsive">
+              <table class="tasks-table compact">
+                <thead>
+                  <tr>
+                    <th>№</th>
+                    <th data-i18n="thHistoryTime">Дата и время (Ташкент, UTC+5)</th>
+                    <th data-i18n="thUserName">Пользователь</th>
+                    <th>Email</th>
+                    <th data-i18n="thUserRole">Роль</th>
+                    <th data-i18n="thHistoryEvent">Событие</th>
+                  </tr>
+                </thead>
+                <tbody id="login-history-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Модальное окно создания и редактирования задачи (только для администратора) -->
+  <div id="task-modal" class="modal-backdrop hidden">
+    <div class="modal-window card-3d">
+      <div class="modal-header">
+        <h3 id="modal-title" data-i18n="modalNewTask">Новая задача</h3>
+        <button type="button" id="modal-close-btn" class="btn-icon">✕</button>
+      </div>
+
+      <form id="task-form" class="modal-form">
+        <input type="hidden" id="task-id" />
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="task-department" data-i18n="filterDeptLabel">Подразделение Финблока</label>
+            <select id="task-department" required>
+              <option value="AI_FM" data-dept-opt="AI_FM">ФМ</option>
+              <option value="DBU" data-dept-opt="DBU">ДБУ</option>
+              <option value="MSFO" data-dept-opt="MSFO">МСФО</option>
+              <option value="ZAKUPKI" data-dept-opt="ZAKUPKI">Закупки</option>
+              <option value="ALM" data-dept-opt="ALM">ALM</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="task-number" data-i18n="modalTaskNum">Порядковый № в подразделении</label>
+            <input type="number" id="task-number" min="1" placeholder="Auto" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="task-title-input" data-i18n="modalTaskTitle">Формулировка задачи</label>
+          <textarea id="task-title-input" rows="3" required></textarea>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="task-due-date" data-i18n="modalDueDate">Плановый срок (дата)</label>
+            <input type="date" id="task-due-date" />
+          </div>
+
+          <div class="form-group">
+            <label for="task-due-text" data-i18n="modalDueText">Текст срока (если нестандартный)</label>
+            <input type="text" id="task-due-text" placeholder="2026-10-30" />
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="task-status" data-i18n="thStatus">Статус подразделения Финблока</label>
+            <select id="task-status" required>
+              <option value="not_started" data-status-opt="not_started">Не начата</option>
+              <option value="in_progress" data-status-opt="in_progress">В работе / в процессе</option>
+              <option value="done" data-status-opt="done">Выполнено</option>
+              <option value="overdue" data-status-opt="overdue">Просрочена</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="task-criticality" data-i18n="thCriticality">Критичность (только Админ)</label>
+            <select id="task-criticality" required>
+              <option value="red" data-crit-opt="red">🔴 Высокая (Red)</option>
+              <option value="yellow" data-crit-opt="yellow">🟡 Средняя (Yellow)</option>
+              <option value="green" data-crit-opt="green">🟢 Низкая (Green)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="task-ai-stage" data-i18n="thAiProcess">Статус AI департамента</label>
+          <select id="task-ai-stage" required>
+            <option value="not_started" data-status-opt="not_started">Не начата</option>
+            <option value="in_progress" data-status-opt="in_progress">В работе</option>
+            <option value="done" data-status-opt="done">Выполнено</option>
+            <option value="overdue" data-status-opt="overdue">Просрочена</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="task-fact" data-i18n="thFact">Факт / продление</label>
+          <input type="text" id="task-fact" />
+        </div>
+
+        <div class="form-group">
+          <label for="task-note" data-i18n="thNote">Примечание</label>
+          <textarea id="task-note" rows="2"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="modal-cancel-btn" class="btn btn-outline" data-i18n="btnCancel">Отмена</button>
+          <button type="submit" class="btn btn-primary" data-i18n="btnSave">Сохранить задачу</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Всплывающее уведомление -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
