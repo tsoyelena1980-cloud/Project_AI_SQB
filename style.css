@@ -1751,10 +1751,11 @@ body.admin-theme .dept-pill {
 
 @media (max-width: 960px) {
   .topbar {
-    padding: 14px 18px;
+    padding: 12px 16px;
+    gap: 12px;
   }
   .main-content {
-    padding: 20px 18px 40px;
+    padding: 14px 14px 40px;
   }
   .filters-row,
   .admin-grid,
@@ -1762,5 +1763,45 @@ body.admin-theme .dept-pill {
   .form-row-2,
   .departments-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .auth-card {
+    padding: 22px 18px;
+  }
+  .form-group input,
+  .form-group select,
+  .form-group textarea,
+  .filter-item input,
+  .filter-item select {
+    font-size: 16px;
+  }
+  .topbar-left,
+  .topbar-right,
+  .main-nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .main-nav {
+    overflow-x: auto;
+  }
+  .nav-tab {
+    flex: 1;
+    text-align: center;
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .kpi-value {
+    font-size: 1.65rem;
+  }
+  .pf-top {
+    flex-direction: column;
+    gap: 3px;
   }
 }

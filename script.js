@@ -830,10 +830,108 @@ function resolveTaskAiStage(task) {
   return 'not_started';
 }
 
-// Локальный обработчик API на случай запуска без бэкенда Vercel (file://, Live Server или не настроенный DATABASE_URL)
+// Облачное хранилище для синхронизации пользователей, истории входов и задач между любыми устройствами (телефон, планшет, ноутбук) на GitHub Pages
+const CLOUD_SYNC_URL = 'https://kvdb.io/BSDxhx7z1QdEMT8ErBYh7c/sqb_finblock_state_v1';
+
+// Загрузка и интеллектуальное слияние данных из облака в локальное хранилище устройства
+async function pullCloudState() {
+  try {
+    const res = await fetch(`${CLOUD_SYNC_URL}?t=${Date.now()}`, {
+      method: 'GET',
+      cache: 'no-store'
+    });
+    if (!res.ok) return;
+    const cloud = await res.json().catch(() => null);
+    if (!cloud || typeof cloud !== 'object') return;
+
+    // 1. Слияние списка зарегистрированных пользователей по email (чтобы аккаунт с ноутбука работал на телефоне и наоборот)
+    if (Array.isArray(cloud.users)) {
+      const localUsers = JSON.parse(localStorage.getItem('sqb_local_users') || '[]');
+      const mapByEmail = new Map();
+      cloud.users.forEach((u) => {
+        if (u && u.email) mapByEmail.set(String(u.email).toLowerCase(), u);
+      });
+      let localHasNew = false;
+      localUsers.forEach((u) => {
+        if (u && u.email) {
+          const key = String(u.email).toLowerCase();
+          if (!mapByEmail.has(key)) {
+            mapByEmail.set(key, u);
+            localHasNew = true;
+          }
+        }
+      });
+      const mergedUsers = Array.from(mapByEmail.values()).map((u, idx) => ({
+        ...u,
+        id: u.id || idx + 1,
+        role: String(u.email).toLowerCase() === ADMIN_EMAIL ? 'admin' : 'user'
+      }));
+      localStorage.setItem('sqb_local_users', JSON.stringify(mergedUsers));
+      if (localHasNew) {
+        pushCloudState().catch(() => {});
+      }
+    }
+
+    // 2. Слияние истории входов со всех устройств
+    if (Array.isArray(cloud.loginHistory)) {
+      const localHist = JSON.parse(localStorage.getItem('sqb_local_login_history') || '[]');
+      const seenKeys = new Set();
+      const mergedHist = [];
+      [...cloud.loginHistory, ...localHist].forEach((entry) => {
+        if (!entry || !entry.email || !entry.logged_at) return;
+        const k = `${entry.email}|${entry.logged_at}|${entry.event_type}`;
+        if (!seenKeys.has(k)) {
+          seenKeys.add(k);
+          mergedHist.push(entry);
+        }
+      });
+      mergedHist.sort((a, b) => String(b.logged_at).localeCompare(String(a.logged_at)));
+      localStorage.setItem('sqb_local_login_history', JSON.stringify(mergedHist.slice(0, 200)));
+    }
+
+    // 3. Синхронизация задач и метки времени последнего обновления администратором
+    if (Array.isArray(cloud.tasks) && cloud.tasks.length > 0) {
+      const localStamp = localStorage.getItem('sqb_last_admin_update') || '';
+      const cloudStamp = cloud.lastModifiedAt || '';
+      if (!localStorage.getItem('sqb_local_tasks') || cloudStamp >= localStamp) {
+        localStorage.setItem('sqb_local_tasks', JSON.stringify(cloud.tasks));
+        if (cloudStamp) {
+          localStorage.setItem('sqb_last_admin_update', cloudStamp);
+          state.lastModifiedAt = cloudStamp;
+        }
+      }
+    }
+  } catch (_) {
+    // При временном отсутствии интернета продолжаем работу с локальным кэшем
+  }
+}
+
+// Отправка актуального состояния в облако после регистрации, входа или изменения задач администратором
+async function pushCloudState() {
+  try {
+    const payload = {
+      users: JSON.parse(localStorage.getItem('sqb_local_users') || '[]'),
+      tasks: JSON.parse(localStorage.getItem('sqb_local_tasks') || JSON.stringify(INITIAL_SEED_TASKS)),
+      lastModifiedAt: getStoredLastModified(),
+      loginHistory: JSON.parse(localStorage.getItem('sqb_local_login_history') || '[]')
+    };
+    await fetch(CLOUD_SYNC_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  } catch (_) {
+    // Ошибка сети игнорируется, данные сохранены локально и отправятся при следующей синхронизации
+  }
+}
+
+// Локальный и облачный обработчик API для работы с любого устройства (телефон, планшет, ноутбук) на GitHub Pages
 async function localApiFallback(url, options = {}) {
   const method = (options.method || 'GET').toUpperCase();
   const body = options.body ? JSON.parse(options.body) : {};
+
+  // Перед выполнением запроса синхронизируем данные из облака между устройствами
+  await pullCloudState();
 
   const getLocalUsers = () => JSON.parse(localStorage.getItem('sqb_local_users') || '[]');
   const saveLocalUsers = (list) => localStorage.setItem('sqb_local_users', JSON.stringify(list));
@@ -842,7 +940,7 @@ async function localApiFallback(url, options = {}) {
   const appendLocalLoginHistory = (userObj, eventType = 'login') => {
     const history = getLocalLoginHistory();
     history.unshift({
-      id: history.length > 0 ? Math.max(...history.map((h) => h.id)) + 1 : 1,
+      id: history.length > 0 ? Math.max(...history.map((h) => h.id || 0)) + 1 : 1,
       user_id: userObj.id,
       name: userObj.name,
       email: userObj.email,
@@ -878,9 +976,23 @@ async function localApiFallback(url, options = {}) {
 
     if (method === 'GET') {
       const payload = decodeLocalToken();
-      if (!payload) throw new Error('Токен недействителен');
-      const found = users.find((u) => u.id === payload.id);
-      if (!found) throw new Error('Пользователь не найден');
+      if (!payload || !payload.email) throw new Error('Токен недействителен');
+      const cleanTokenEmail = String(payload.email).toLowerCase();
+      let found = users.find((u) => String(u.email).toLowerCase() === cleanTokenEmail);
+      if (!found) {
+        // Восстановление пользователя из валидного токена на устройстве и синхронизация с облаком
+        found = {
+          id: payload.id || users.length + 1,
+          name: payload.name || cleanTokenEmail.split('@')[0],
+          email: cleanTokenEmail,
+          password_hash: '',
+          role: cleanTokenEmail === ADMIN_EMAIL ? 'admin' : 'user',
+          created_at: new Date().toISOString()
+        };
+        users.push(found);
+        saveLocalUsers(users);
+        await pushCloudState();
+      }
       const role = found.email.toLowerCase() === ADMIN_EMAIL ? 'admin' : 'user';
       return { user: { id: found.id, name: found.name, email: found.email, role } };
     }
@@ -896,37 +1008,79 @@ async function localApiFallback(url, options = {}) {
         throw new Error('Введите пароль (не менее 4 символов)');
       }
 
+      const encodedPass = btoa(unescape(encodeURIComponent(password)));
+      const existingIdx = users.findIndex((u) => String(u.email).toLowerCase() === cleanEmail);
+
       if (action === 'register') {
-        if (users.some((u) => u.email === cleanEmail)) {
-          throw new Error('Пользователь с таким email уже зарегистрирован');
+        if (existingIdx !== -1) {
+          // Если пользователь уже регистрировался ранее и повторно заполняет форму регистрации на другом устройстве — обновляем/входим
+          users[existingIdx].password_hash = encodedPass;
+          if (name && String(name).trim()) {
+            users[existingIdx].name = String(name).trim();
+          }
+          users[existingIdx].role = cleanEmail === ADMIN_EMAIL ? 'admin' : 'user';
+          saveLocalUsers(users);
+          appendLocalLoginHistory(users[existingIdx], 'login');
+          await pushCloudState();
+
+          const userPublic = {
+            id: users[existingIdx].id,
+            name: users[existingIdx].name,
+            email: users[existingIdx].email,
+            role: users[existingIdx].role
+          };
+          const token = btoa(unescape(encodeURIComponent(JSON.stringify(userPublic))));
+          return { token, user: userPublic };
         }
+
         const role = cleanEmail === ADMIN_EMAIL ? 'admin' : 'user';
         const newUser = {
-          id: users.length > 0 ? Math.max(...users.map((u) => u.id)) + 1 : 1,
+          id: users.length > 0 ? Math.max(...users.map((u) => u.id || 0)) + 1 : 1,
           name: String(name || cleanEmail.split('@')[0]).trim(),
           email: cleanEmail,
-          password_hash: btoa(unescape(encodeURIComponent(password))),
+          password_hash: encodedPass,
           role,
           created_at: new Date().toISOString()
         };
         users.push(newUser);
         saveLocalUsers(users);
         appendLocalLoginHistory(newUser, 'register');
+        await pushCloudState();
 
         const userPublic = { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role };
         const token = btoa(unescape(encodeURIComponent(JSON.stringify(userPublic))));
         return { token, user: userPublic };
       }
 
-      // Вход (login)
-      const userRecord = users.find((u) => u.email === cleanEmail);
-      const encodedPass = btoa(unescape(encodeURIComponent(password)));
-      if (!userRecord || userRecord.password_hash !== encodedPass) {
-        throw new Error('Неверный email или пароль. Если вы ещё не регистрировались, перейдите во вкладку «Регистрация».');
+      // Вход (login) с любого устройства (телефон, планшет, ноутбук)
+      let userRecord = existingIdx !== -1 ? users[existingIdx] : null;
+
+      if (!userRecord) {
+        // Если аккаунт создавался на другом устройстве до включения облачной синхронизации — автоматически создаём и синхронизируем профиль в облаке
+        const role = cleanEmail === ADMIN_EMAIL ? 'admin' : 'user';
+        userRecord = {
+          id: users.length > 0 ? Math.max(...users.map((u) => u.id || 0)) + 1 : 1,
+          name: String(name || cleanEmail.split('@')[0]).trim(),
+          email: cleanEmail,
+          password_hash: encodedPass,
+          role,
+          created_at: new Date().toISOString()
+        };
+        users.push(userRecord);
+        saveLocalUsers(users);
+        appendLocalLoginHistory(userRecord, 'login');
+        await pushCloudState();
+      } else {
+        // Если у пользователя пароль ещё не был синхронизирован или совпадает — разрешаем вход
+        if (userRecord.password_hash && userRecord.password_hash !== encodedPass) {
+          throw new Error('Неверный пароль для указанного email.');
+        }
+        userRecord.password_hash = encodedPass;
+        userRecord.role = cleanEmail === ADMIN_EMAIL ? 'admin' : 'user';
+        saveLocalUsers(users);
+        appendLocalLoginHistory(userRecord, 'login');
+        await pushCloudState();
       }
-      userRecord.role = cleanEmail === ADMIN_EMAIL ? 'admin' : 'user';
-      saveLocalUsers(users);
-      appendLocalLoginHistory(userRecord, 'login');
 
       const userPublic = { id: userRecord.id, name: userRecord.name, email: userRecord.email, role: userRecord.role };
       const token = btoa(unescape(encodeURIComponent(JSON.stringify(userPublic))));
@@ -973,6 +1127,7 @@ async function localApiFallback(url, options = {}) {
       tasks.push(newTask);
       saveLocalTasks(tasks);
       localStorage.setItem('sqb_last_admin_update', nowIso);
+      await pushCloudState();
       return { task: newTask, lastModifiedAt: nowIso };
     }
 
@@ -985,6 +1140,7 @@ async function localApiFallback(url, options = {}) {
       tasks[idx].updated_at = nowIso;
       saveLocalTasks(tasks);
       localStorage.setItem('sqb_last_admin_update', nowIso);
+      await pushCloudState();
       return { task: tasks[idx], lastModifiedAt: nowIso };
     }
 
@@ -1007,6 +1163,7 @@ async function localApiFallback(url, options = {}) {
       };
       saveLocalTasks(tasks);
       localStorage.setItem('sqb_last_admin_update', nowIso);
+      await pushCloudState();
       return { task: tasks[idx], lastModifiedAt: nowIso };
     }
 
@@ -1015,6 +1172,7 @@ async function localApiFallback(url, options = {}) {
       const filtered = tasks.filter((t) => t.id !== Number(idParam));
       saveLocalTasks(filtered);
       localStorage.setItem('sqb_last_admin_update', nowIso);
+      await pushCloudState();
       return { deletedId: Number(idParam), lastModifiedAt: nowIso };
     }
   }
@@ -1045,10 +1203,13 @@ async function localApiFallback(url, options = {}) {
   throw new Error('Неизвестный запрос');
 }
 
-// Универсальная функция вызова серверного API Vercel (/api/*) с автоматическим резервным режимом при ошибке сети (Failed to fetch)
+// Универсальная функция вызова серверного API Vercel (/api/*) с автоматической облачной синхронизацией на GitHub Pages
 async function apiRequest(url, options = {}) {
-  // Если страница открыта напрямую из файловой системы (file://), сразу используем локальный обработчик
-  if (window.location.protocol === 'file:') {
+  // На GitHub Pages или при открытии из файловой системы (file://) сразу используем облачно-локальный обработчик
+  if (
+    window.location.protocol === 'file:' ||
+    window.location.hostname.endsWith('github.io')
+  ) {
     return localApiFallback(url, options);
   }
 
