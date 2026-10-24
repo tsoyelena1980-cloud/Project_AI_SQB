@@ -177,8 +177,8 @@
           </div>
         </div>
 
-        <!-- 2 главных графика в один ряд -->
-        <div class="charts-grid">
+        <!-- График: Разрез подразделений -->
+        <div class="charts-grid single-chart-grid">
           <div class="chart-card card-3d">
             <div class="card-header">
               <div>
@@ -190,18 +190,6 @@
               <canvas id="chart-department"></canvas>
             </div>
           </div>
-
-          <div class="chart-card card-3d">
-            <div class="card-header">
-              <div>
-                <span class="panel-eyebrow" data-i18n="chartEyebrowStatus">СТАТУСЫ И ПРОГРЕСС</span>
-                <h3 data-i18n="chartStatusTitle">Распределение по статусам</h3>
-              </div>
-            </div>
-            <div class="chart-box">
-              <canvas id="chart-status"></canvas>
-            </div>
-          </div>
         </div>
 
         <!-- Компактный блок: Общий прогресс и План / Факт по подразделениям -->
@@ -210,7 +198,7 @@
             <div class="panel-header">
               <div>
                 <span class="panel-eyebrow" data-i18n="execProgressEyebrow">ИНДЕКС РЕАЛИЗАЦИИ</span>
-                <h3 data-i18n="execProgressTitle">Общий прогресс и План / Факт</h3>
+                <h3 data-i18n="execProgressTitle">Прогресс выполнения</h3>
               </div>
               <strong id="active-coverage-val" class="score-badge">0%</strong>
             </div>
@@ -218,12 +206,15 @@
             <div class="stacked-progress-track">
               <div id="stacked-done-bar" class="stacked-segment seg-done" style="width: 0%"></div>
               <div id="stacked-progress-bar" class="stacked-segment seg-progress" style="width: 0%"></div>
+              <div id="stacked-pending-bar" class="stacked-segment seg-pending" style="width: 0%"></div>
+              <div id="stacked-overdue-bar" class="stacked-segment seg-overdue" style="width: 0%"></div>
             </div>
 
             <div class="stacked-legend">
               <span><i class="dot dot-done"></i> <span data-i18n="kpiDoneLabel">Выполнено</span>: <b id="legend-done-cnt">0</b></span>
               <span><i class="dot dot-progress"></i> <span data-i18n="kpiProgressLabel">В работе</span>: <b id="legend-prog-cnt">0</b></span>
-              <span><i class="dot dot-pending"></i> <span data-i18n="statusPendingShort">Ожидает</span>: <b id="legend-wait-cnt">0</b></span>
+              <span><i class="dot dot-pending"></i> <span data-i18n="statusNotStartedShort">Не начато</span>: <b id="legend-wait-cnt">0</b></span>
+              <span><i class="dot dot-overdue"></i> <span data-i18n="kpiOverdueLabel">Просрочено</span>: <b id="legend-overdue-cnt">0</b></span>
             </div>
 
             <div id="plan-fact-list" class="plan-fact-list compact-pf"></div>

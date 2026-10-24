@@ -36,9 +36,10 @@ const I18N = {
     kpiCriticalLabel: 'Критичных (🔴)',
     kpiCriticalFoot: 'Высокий приоритет',
     execProgressEyebrow: 'ИНДЕКС РЕАЛИЗАЦИИ',
-    execProgressTitle: 'Прогресс выполнения и План / Факт',
+    execProgressTitle: 'Прогресс выполнения',
     planFactSummaryLabel: 'Интегральный охват (Выполнено + В работе)',
-    statusPendingShort: 'Ожидает',
+    statusPendingShort: 'Не начато',
+    statusNotStartedShort: 'Не начато',
     pfFactPlanLabel: 'Факт / План',
     deadlineEyebrow: 'ТАЙМ-МЕНЕДЖМЕНТ',
     deadlineTitle: 'Контроль сроков и SLA',
@@ -65,7 +66,9 @@ const I18N = {
     chartCritTitle: 'Распределение по критичности (🔴 / 🟡 / 🟢)',
     chartMonthlyTitle: 'Динамика плановых сроков по месяцам',
     chartDoneSeries: 'Выполнено',
-    chartPendingSeries: 'В работе / Ожидает',
+    chartPendingSeries: 'В работе',
+    chartNotStartedSeries: 'Не начато',
+    chartOverdueSeries: 'Просрочено',
     chartTotalByMonth: 'Всего задач по сроку',
     chartDoneByMonth: 'Из них выполнено',
     noDateLabel: 'Без даты',
@@ -196,9 +199,10 @@ const I18N = {
     kpiCriticalLabel: 'Critical (🔴)',
     kpiCriticalFoot: 'High priority',
     execProgressEyebrow: 'EXECUTION INDEX',
-    execProgressTitle: 'Execution Progress & Plan / Actual',
+    execProgressTitle: 'Execution Progress',
     planFactSummaryLabel: 'Active Coverage (Completed + In Progress)',
-    statusPendingShort: 'Pending',
+    statusPendingShort: 'Not Started',
+    statusNotStartedShort: 'Not Started',
     pfFactPlanLabel: 'Actual / Plan',
     deadlineEyebrow: 'TIME MANAGEMENT',
     deadlineTitle: 'Deadline Control & SLA',
@@ -225,7 +229,9 @@ const I18N = {
     chartCritTitle: 'Distribution by Criticality (🔴 / 🟡 / 🟢)',
     chartMonthlyTitle: 'Monthly Planned Deadlines Dynamics',
     chartDoneSeries: 'Completed',
-    chartPendingSeries: 'In Progress / Pending',
+    chartPendingSeries: 'In Progress',
+    chartNotStartedSeries: 'Not Started',
+    chartOverdueSeries: 'Overdue',
     chartTotalByMonth: 'Total tasks by deadline',
     chartDoneByMonth: 'Completed tasks',
     noDateLabel: 'No date',
@@ -356,9 +362,10 @@ const I18N = {
     kpiCriticalLabel: 'Muhim (🔴)',
     kpiCriticalFoot: 'Yuqori ustuvorlik',
     execProgressEyebrow: 'IJRO INDEKSI',
-    execProgressTitle: 'Bajarilish jarayoni va Reja / Fakt',
+    execProgressTitle: 'Bajarilish jarayoni',
     planFactSummaryLabel: 'Umumiy qamrov (Bajarildi + Jarayonda)',
-    statusPendingShort: 'Kutilmoqda',
+    statusPendingShort: 'Boshlanmagan',
+    statusNotStartedShort: 'Boshlanmagan',
     pfFactPlanLabel: 'Fakt / Reja',
     deadlineEyebrow: 'VAQT NAZORATI',
     deadlineTitle: 'Muddatlar nazorati va SLA',
@@ -385,7 +392,9 @@ const I18N = {
     chartCritTitle: 'Muhimlik darajasi bo‘yicha taqsimot (🔴 / 🟡 / 🟢)',
     chartMonthlyTitle: 'Oylar bo‘yicha rejadagi muddatlar dinamikasi',
     chartDoneSeries: 'Bajarildi',
-    chartPendingSeries: 'Jarayonda / Kutilmoqda',
+    chartPendingSeries: 'Jarayonda',
+    chartNotStartedSeries: 'Boshlanmagan',
+    chartOverdueSeries: 'Muddati o‘tgan',
     chartTotalByMonth: 'Muddat bo‘yicha jami vazifalar',
     chartDoneByMonth: 'Shundan bajarilgani',
     noDateLabel: 'Sanasiz',
@@ -1241,15 +1250,19 @@ function renderDashboard() {
   const critLabels = I18N[state.lang].criticalities;
   const deptKeys = Object.keys(deptNames);
 
-  // === БЛОК 1: Прогресс выполнения и План / Факт по подразделениям ===
+  // === БЛОК 1: Индекс реализации (Прогресс выполнения и План / Факт по подразделениям) ===
   const activeCoveragePct = total > 0 ? Math.round(((doneCount + inProgressCount) / total) * 100) : 0;
+  const notStartedPct = total > 0 ? Math.round((notStartedCount / total) * 100) : 0;
   setElText('overall-score-pill', `${donePct}% DONE`);
   setElText('active-coverage-val', `${activeCoveragePct}% (${doneCount + inProgressCount}/${total})`);
   setElWidth('stacked-done-bar', donePct);
   setElWidth('stacked-progress-bar', progPct);
+  setElWidth('stacked-pending-bar', notStartedPct);
+  setElWidth('stacked-overdue-bar', overPct);
   setElText('legend-done-cnt', doneCount);
   setElText('legend-prog-cnt', inProgressCount);
-  setElText('legend-wait-cnt', notStartedCount + overdueCount);
+  setElText('legend-wait-cnt', notStartedCount);
+  setElText('legend-overdue-cnt', overdueCount);
 
   const pfListEl = document.getElementById('plan-fact-list');
   if (pfListEl) {
@@ -1259,18 +1272,29 @@ function renderDashboard() {
         const dPlan = dTasks.length;
         const dFact = dTasks.filter((task) => task.status === 'done').length;
         const dActive = dTasks.filter((task) => task.status === 'in_progress').length;
+        const dNotStarted = dTasks.filter((task) => task.status === 'not_started').length;
+        const dOverdue = dTasks.filter((task) => task.status === 'overdue').length;
         const dFactPct = dPlan > 0 ? Math.round((dFact / dPlan) * 100) : 0;
         const dActivePct = dPlan > 0 ? Math.round((dActive / dPlan) * 100) : 0;
+        const dNotStartedPct = dPlan > 0 ? Math.round((dNotStarted / dPlan) * 100) : 0;
+        const dOverduePct = dPlan > 0 ? Math.round((dOverdue / dPlan) * 100) : 0;
 
         return `
           <div class="pf-row">
             <div class="pf-top">
               <span class="pf-dept">${deptNames[k]}</span>
-              <span class="pf-numbers">${t('pfFactPlanLabel')}: <strong>${dFact}</strong> / ${dPlan} (${dFactPct}%)</span>
+              <span class="pf-numbers">
+                ${t('chartDoneSeries')}: <strong>${dFact}</strong> ·
+                ${t('chartPendingSeries')}: <b style="color:#c084fc;">${dActive}</b> ·
+                ${t('chartNotStartedSeries')}: <b style="color:#94a3b8;">${dNotStarted}</b> ·
+                ${t('chartOverdueSeries')}: <b style="color:#fb7185;">${dOverdue}</b>
+              </span>
             </div>
             <div class="pf-bar-bg">
               <div class="pf-bar-done" style="width: ${dFactPct}%"></div>
               <div class="pf-bar-active" style="width: ${dActivePct}%"></div>
+              <div class="pf-bar-pending" style="width: ${dNotStartedPct}%"></div>
+              <div class="pf-bar-overdue" style="width: ${dOverduePct}%"></div>
             </div>
           </div>
         `;
@@ -1329,47 +1353,21 @@ function renderDashboard() {
       .join('');
   }
 
-  // === 2 КЛЮЧЕВЫХ ИНТЕРАКТИВНЫХ ГРАФИКА CHART.JS ===
+  // === ГРАФИК CHART.JS: РАЗРЕЗ ПОДРАЗДЕЛЕНИЙ (Выполнено, В работе, Не начато, Просрочено) ===
   const isAdminTheme = isCurrentUserAdmin();
-  const accentSeriesColor = isAdminTheme ? '#a855f7' : '#0ea5e9';
-  const barPendingColor = isAdminTheme ? '#9333ea' : '#2563eb';
+  const barInProgressColor = isAdminTheme ? '#9333ea' : '#2563eb';
 
-  // 1. График по статусам
-  const statusCanvas = document.getElementById('chart-status');
-  if (statusCanvas) {
-    const statusCtx = statusCanvas.getContext('2d');
-    if (state.charts.status) state.charts.status.destroy();
-    state.charts.status = new Chart(statusCtx, {
-      type: 'doughnut',
-      data: {
-        labels: [statusLabels.done, statusLabels.in_progress, statusLabels.not_started, statusLabels.overdue],
-        datasets: [
-          {
-            data: [doneCount, inProgressCount, notStartedCount, overdueCount],
-            backgroundColor: ['#10b981', accentSeriesColor, '#64748b', '#f43f5e'],
-            hoverOffset: 8,
-            borderWidth: 2,
-            borderColor: '#0b1426'
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '65%',
-        plugins: {
-          legend: { position: 'right', labels: { color: '#cbd5e1', padding: 14, usePointStyle: true } }
-        }
-      }
-    });
-  }
-
-  // 2. График План / Факт по подразделениям Финблока
   const deptDone = deptKeys.map(
     (k) => state.tasks.filter((t) => t.department === k && t.status === 'done').length
   );
-  const deptOther = deptKeys.map(
-    (k) => state.tasks.filter((t) => t.department === k && t.status !== 'done').length
+  const deptInProgress = deptKeys.map(
+    (k) => state.tasks.filter((t) => t.department === k && t.status === 'in_progress').length
+  );
+  const deptNotStarted = deptKeys.map(
+    (k) => state.tasks.filter((t) => t.department === k && t.status === 'not_started').length
+  );
+  const deptOverdue = deptKeys.map(
+    (k) => state.tasks.filter((t) => t.department === k && t.status === 'overdue').length
   );
 
   const deptCanvas = document.getElementById('chart-department');
@@ -1389,8 +1387,20 @@ function renderDashboard() {
           },
           {
             label: t('chartPendingSeries'),
-            data: deptOther,
-            backgroundColor: barPendingColor,
+            data: deptInProgress,
+            backgroundColor: barInProgressColor,
+            borderRadius: 6
+          },
+          {
+            label: t('chartNotStartedSeries'),
+            data: deptNotStarted,
+            backgroundColor: '#64748b',
+            borderRadius: 6
+          },
+          {
+            label: t('chartOverdueSeries'),
+            data: deptOverdue,
+            backgroundColor: '#f43f5e',
             borderRadius: 6
           }
         ]
@@ -1403,7 +1413,7 @@ function renderDashboard() {
           y: { stacked: true, beginAtZero: true, ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: 'rgba(36, 50, 79, 0.35)' } }
         },
         plugins: {
-          legend: { position: 'bottom', labels: { color: '#cbd5e1', padding: 12, usePointStyle: true } }
+          legend: { position: 'bottom', labels: { color: '#cbd5e1', padding: 14, usePointStyle: true } }
         }
       }
     });
