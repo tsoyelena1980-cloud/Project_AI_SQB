@@ -662,6 +662,8 @@ const state = {
   tasks: [],
   lastModifiedAt: getStoredLastModified(),
   hasUnsavedChanges: false,
+  isSavingToCloud: false,
+  lastLocalAdminWriteMs: 0,
   users: [],
   loginHistory: [],
   authMode: 'login',
@@ -863,8 +865,8 @@ function resolveTaskAiStage(task) {
   return 'not_started';
 }
 
-// Облачное хранилище для синхронизации пользователей, истории входов и задач между любыми устройствами (телефон, планшет, ноутбук) на GitHub Pages
-const CLOUD_SYNC_URL = 'https://kvdb.io/BSDxhx7z1QdEMT8ErBYh7c/sqb_finblock_state_v1';
+// Облачное хранилище (npoint.io JSON API с полной поддержкой CORS без ограничений по активации email) для синхронизации между ноутбуком, телефоном и планшетом
+const CLOUD_SYNC_URL = 'https://api.npoint.io/18aa9dc70563719c9d6b';
 
 // Визуальная индикация кнопки «💾 Сохранить изменения» у администратора
 function setUnsavedAdminIndicator(hasChanges) {
@@ -879,8 +881,9 @@ function setUnsavedAdminIndicator(hasChanges) {
 
 // Загрузка и интеллектуальное слияние данных из облака в локальное хранилище устройства
 async function pullCloudState() {
+  if (state.isSavingToCloud) return { updated: false };
   try {
-    const res = await fetch(`${CLOUD_SYNC_URL}?t=${Date.now()}`, {
+    const res = await fetch(`${CLOUD_SYNC_URL}?t=${Date.now()}_${Math.random().toString(36).slice(2)}`, {
       method: 'GET',
       cache: 'no-store'
     });
@@ -935,20 +938,18 @@ async function pullCloudState() {
       localStorage.setItem('sqb_local_login_history', JSON.stringify(mergedHist.slice(0, 200)));
     }
 
-    // 3. Синхронизация задач и метки времени последнего сохранения администратором для всех пользователей и устройств
+    // 3. Безусловная синхронизация задач и метки времени из облака на всех устройствах (телефон, планшет, ноутбук),
+    // кроме случая, когда текущая вкладка администратора только что (< 5 сек назад) записала новые данные в облако
     if (Array.isArray(cloud.tasks) && cloud.tasks.length > 0) {
-      const localStamp = getStoredLastModified();
-      const cloudStamp = cloud.lastModifiedAt || '';
-      const prevTasksJson = localStorage.getItem('sqb_local_tasks') || '';
-      const nextTasksJson = JSON.stringify(cloud.tasks);
+      const recentlyWroteLocally =
+        state.lastLocalAdminWriteMs > 0 && Date.now() - state.lastLocalAdminWriteMs < 5000;
 
-      // Для обычных пользователей облачная версия от администратора ВСЕГДА является единственным источником истины.
-      // Для администратора облачная версия применяется, если нет несохранённых локальных правок.
-      const shouldAdoptCloudTasks =
-        !isCurrentUserAdmin() ||
-        (!state.hasUnsavedChanges && (!prevTasksJson || !localStamp || cloudStamp >= localStamp));
+      if (!recentlyWroteLocally) {
+        const localStamp = getStoredLastModified();
+        const cloudStamp = cloud.lastModifiedAt || '';
+        const prevTasksJson = localStorage.getItem('sqb_local_tasks') || '';
+        const nextTasksJson = JSON.stringify(cloud.tasks);
 
-      if (shouldAdoptCloudTasks) {
         if (prevTasksJson !== nextTasksJson || (cloudStamp && cloudStamp !== localStamp)) {
           tasksUpdated = true;
         }
@@ -969,10 +970,15 @@ async function pullCloudState() {
 
 // Отправка актуального состояния в облако (задачи перезаписываются ТОЛЬКО при сохранении администратором)
 async function pushCloudState(options = { includeTasks: false }) {
+  const isTaskUpdate = Boolean(options && options.includeTasks);
+  if (isTaskUpdate) {
+    state.isSavingToCloud = true;
+    state.lastLocalAdminWriteMs = Date.now();
+  }
   try {
     let existingCloud = null;
     try {
-      const getRes = await fetch(`${CLOUD_SYNC_URL}?t=${Date.now()}`, {
+      const getRes = await fetch(`${CLOUD_SYNC_URL}?t=${Date.now()}_${Math.random().toString(36).slice(2)}`, {
         method: 'GET',
         cache: 'no-store'
       });
@@ -987,7 +993,7 @@ async function pushCloudState(options = { includeTasks: false }) {
     const localHistory = JSON.parse(localStorage.getItem('sqb_local_login_history') || '[]');
 
     const canPushTasks =
-      Boolean(options && options.includeTasks) ||
+      isTaskUpdate ||
       !existingCloud ||
       !Array.isArray(existingCloud.tasks) ||
       existingCloud.tasks.length === 0;
@@ -1000,7 +1006,13 @@ async function pushCloudState(options = { includeTasks: false }) {
       ? getStoredLastModified() || new Date().toISOString()
       : existingCloud.lastModifiedAt || getStoredLastModified() || new Date().toISOString();
 
+    const nextSyncVersion =
+      existingCloud && typeof existingCloud.syncVersion === 'number'
+        ? existingCloud.syncVersion + 1
+        : 1;
+
     const payload = {
+      syncVersion: nextSyncVersion,
       users: localUsers,
       tasks: tasksToSave,
       lastModifiedAt: stampToSave,
@@ -1008,12 +1020,16 @@ async function pushCloudState(options = { includeTasks: false }) {
     };
 
     await fetch(CLOUD_SYNC_URL, {
-      method: 'PUT',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
   } catch (_) {
     // Ошибка сети игнорируется, данные сохранены локально и отправятся при следующей синхронизации
+  } finally {
+    if (isTaskUpdate) {
+      state.isSavingToCloud = false;
+    }
   }
 }
 
@@ -1022,6 +1038,7 @@ async function saveAllAdminChanges() {
   if (!isCurrentUserAdmin()) return;
   const nowIso = new Date().toISOString();
   state.lastModifiedAt = nowIso;
+  state.lastLocalAdminWriteMs = Date.now();
   localStorage.setItem('sqb_last_admin_update', nowIso);
   if (Array.isArray(state.tasks) && state.tasks.length > 0) {
     localStorage.setItem('sqb_local_tasks', JSON.stringify(state.tasks));
@@ -1039,8 +1056,10 @@ async function localApiFallback(url, options = {}) {
   const method = (options.method || 'GET').toUpperCase();
   const body = options.body ? JSON.parse(options.body) : {};
 
-  // Перед выполнением запроса синхронизируем данные из облака между устройствами
-  await pullCloudState();
+  // Перед чтением или авторизацией синхронизируем данные из облака между устройствами
+  if (!url.startsWith('/api/tasks') || method === 'GET') {
+    await pullCloudState();
+  }
 
   const getLocalUsers = () => JSON.parse(localStorage.getItem('sqb_local_users') || '[]');
   const saveLocalUsers = (list) => localStorage.setItem('sqb_local_users', JSON.stringify(list));
@@ -2425,7 +2444,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // как только администратор нажимает «💾 Сохранить изменения», данные автоматически обновляются у всех открытых пользователей
   const syncFromCloudIfChanged = async () => {
     if (!state.token || !state.user) return;
-    if (isCurrentUserAdmin() && state.hasUnsavedChanges) return;
+    if (state.isSavingToCloud) return;
     const prevStamp = state.lastModifiedAt;
     const prevTasksRaw = localStorage.getItem('sqb_local_tasks') || '';
     const res = await pullCloudState();
