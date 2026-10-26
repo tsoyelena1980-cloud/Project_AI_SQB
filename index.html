@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261024-3" />
+  <link rel="stylesheet" href="style.css?v=20261026-4" />
 </head>
 <body>
   <!-- Декоративное фоновое свечение премиальной BI-системы -->
@@ -109,6 +109,9 @@
             <span id="current-user-sub" class="user-role-sub hidden">Полный доступ к управлению</span>
           </div>
         </div>
+        <button type="button" id="admin-save-top-btn" class="btn btn-save-admin hidden" data-i18n="btnSaveChangesAdmin">
+          💾 Сохранить изменения
+        </button>
         <button type="button" id="refresh-data-btn" class="btn btn-ghost" title="Sync">↻</button>
         <button type="button" id="logout-btn" class="btn btn-outline" data-i18n="btnLogout">Выйти</button>
       </div>
@@ -400,9 +403,14 @@
                 <span id="filtered-dept-pct" class="score-badge" style="font-size:0.74rem;padding:2px 8px;">0%</span>
               </div>
             </div>
-            <button type="button" id="add-task-btn" class="btn btn-primary hidden" data-i18n="btnAddTask">
-              + Добавить задачу
-            </button>
+            <div class="admin-toolbar-btns">
+              <button type="button" id="admin-save-tasks-btn" class="btn btn-save-admin hidden" data-i18n="btnSaveChangesAdmin">
+                💾 Сохранить изменения
+              </button>
+              <button type="button" id="add-task-btn" class="btn btn-primary hidden" data-i18n="btnAddTask">
+                + Добавить задачу
+              </button>
+            </div>
           </div>
         </div>
 
@@ -441,9 +449,14 @@
 
         <div id="admin-panel-content" class="admin-grid hidden">
           <div class="admin-card card-3d">
-            <div class="card-header">
-              <h3 data-i18n="adminCritTitle">Быстрое управление критичностью задач (🔴 / 🟡 / 🟢)</h3>
-              <p class="card-sub" data-i18n="adminCritSub">Мгновенная раскраска приоритетов администратором с сохранением в Neon PostgreSQL</p>
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+              <div>
+                <h3 data-i18n="adminCritTitle">Быстрое управление критичностью задач (🔴 / 🟡 / 🟢)</h3>
+                <p class="card-sub" data-i18n="adminCritSub">Мгновенная раскраска приоритетов администратором с сохранением в Neon PostgreSQL</p>
+              </div>
+              <button type="button" id="admin-save-panel-btn" class="btn btn-save-admin" data-i18n="btnSaveChangesAdmin">
+                💾 Сохранить изменения
+              </button>
             </div>
             <div id="admin-quick-criticality-list" class="quick-crit-list"></div>
           </div>
@@ -595,6 +608,6 @@
   <!-- Всплывающее уведомление -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="script.js?v=20261024-3"></script>
+  <script src="script.js?v=20261026-4"></script>
 </body>
 </html>

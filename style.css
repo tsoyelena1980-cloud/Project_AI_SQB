@@ -1811,3 +1811,47 @@ body.admin-theme .dept-pill {
     gap: 3px;
   }
 }
+
+/* Кнопка сохранения и публикации изменений администратором для всех устройств */
+.admin-toolbar-btns {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-save-admin {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border: 1px solid rgba(52, 211, 153, 0.65);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 8px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.32);
+  transition: all 0.22s ease;
+  white-space: nowrap;
+}
+
+.btn-save-admin:hover {
+  background: linear-gradient(135deg, #34d399, #10b981);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.48);
+}
+
+.btn-save-admin.has-changes {
+  background: linear-gradient(135deg, #a855f7, #10b981);
+  border-color: #6ee7b7;
+  animation: pulseSaveBtn 1.8s infinite ease-in-out;
+}
+
+@keyframes pulseSaveBtn {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55), 0 6px 18px rgba(168, 85, 247, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0), 0 8px 24px rgba(16, 185, 129, 0.6);
+  }
+}
+

@@ -133,6 +133,8 @@ const I18N = {
     modalDueText: 'Текст срока (если нестандартный)',
     btnCancel: 'Отмена',
     btnSave: 'Сохранить задачу',
+    btnSaveChangesAdmin: '💾 Сохранить изменения',
+    toastAdminSavedAll: '✓ Все изменения сохранены и обновлены у всех пользователей на всех устройствах!',
     toastWelcome: 'Добро пожаловать',
     toastSynced: 'Данные синхронизированы с Neon PostgreSQL',
     toastTaskUpdated: 'Задача обновлена',
@@ -302,6 +304,8 @@ const I18N = {
     modalDueText: 'Due Date Text (if custom)',
     btnCancel: 'Cancel',
     btnSave: 'Save Task',
+    btnSaveChangesAdmin: '💾 Save Changes',
+    toastAdminSavedAll: '✓ All changes saved and updated for all users across all devices!',
     toastWelcome: 'Welcome',
     toastSynced: 'Data synchronized with Neon PostgreSQL',
     toastTaskUpdated: 'Task updated',
@@ -471,6 +475,8 @@ const I18N = {
     modalDueText: 'Muddat matni (nostandart bo‘lsa)',
     btnCancel: 'Bekor qilish',
     btnSave: 'Saqlash',
+    btnSaveChangesAdmin: '💾 O‘zgarishlarni saqlash',
+    toastAdminSavedAll: '✓ Barcha o‘zgarishlar saqlandi va barcha qurilmalardagi foydalanuvchilarda yangilandi!',
     toastWelcome: 'Xush kelibsiz',
     toastSynced: 'Ma’lumotlar Neon PostgreSQL bilan sinxronlashtirildi',
     toastTaskUpdated: 'Vazifa yangilandi',
@@ -639,13 +645,11 @@ const CRIT_ICONS = {
   green: '🟢'
 };
 
-// Получение актуальной метки последнего обновления (сброс старой заглушки 23.10.2026 на реальное время)
+// Получение актуальной метки последнего обновления администратором (без генерации ложной локальной метки при открытии на новом устройстве)
 function getStoredLastModified() {
   const saved = localStorage.getItem('sqb_last_admin_update');
   if (!saved || saved === '2026-10-23T18:00:00+05:00') {
-    const nowIso = new Date().toISOString();
-    localStorage.setItem('sqb_last_admin_update', nowIso);
-    return nowIso;
+    return '';
   }
   return saved;
 }
@@ -657,6 +661,7 @@ const state = {
   user: null,
   tasks: [],
   lastModifiedAt: getStoredLastModified(),
+  hasUnsavedChanges: false,
   users: [],
   loginHistory: [],
   authMode: 'login',
@@ -665,6 +670,7 @@ const state = {
   charts: {
     status: null,
     department: null,
+    aiDepartment: null,
     criticality: null,
     monthly: null
   }
@@ -860,6 +866,17 @@ function resolveTaskAiStage(task) {
 // Облачное хранилище для синхронизации пользователей, истории входов и задач между любыми устройствами (телефон, планшет, ноутбук) на GitHub Pages
 const CLOUD_SYNC_URL = 'https://kvdb.io/BSDxhx7z1QdEMT8ErBYh7c/sqb_finblock_state_v1';
 
+// Визуальная индикация кнопки «💾 Сохранить изменения» у администратора
+function setUnsavedAdminIndicator(hasChanges) {
+  state.hasUnsavedChanges = Boolean(hasChanges);
+  ['admin-save-top-btn', 'admin-save-tasks-btn', 'admin-save-panel-btn'].forEach((id) => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.classList.toggle('has-changes', state.hasUnsavedChanges);
+    }
+  });
+}
+
 // Загрузка и интеллектуальное слияние данных из облака в локальное хранилище устройства
 async function pullCloudState() {
   try {
@@ -867,9 +884,11 @@ async function pullCloudState() {
       method: 'GET',
       cache: 'no-store'
     });
-    if (!res.ok) return;
+    if (!res.ok) return { updated: false };
     const cloud = await res.json().catch(() => null);
-    if (!cloud || typeof cloud !== 'object') return;
+    if (!cloud || typeof cloud !== 'object') return { updated: false };
+
+    let tasksUpdated = false;
 
     // 1. Слияние списка зарегистрированных пользователей по email (чтобы аккаунт с ноутбука работал на телефоне и наоборот)
     if (Array.isArray(cloud.users)) {
@@ -895,7 +914,7 @@ async function pullCloudState() {
       }));
       localStorage.setItem('sqb_local_users', JSON.stringify(mergedUsers));
       if (localHasNew) {
-        pushCloudState().catch(() => {});
+        pushCloudState({ includeTasks: false }).catch(() => {});
       }
     }
 
@@ -916,32 +935,78 @@ async function pullCloudState() {
       localStorage.setItem('sqb_local_login_history', JSON.stringify(mergedHist.slice(0, 200)));
     }
 
-    // 3. Синхронизация задач и метки времени последнего обновления администратором
+    // 3. Синхронизация задач и метки времени последнего сохранения администратором для всех пользователей и устройств
     if (Array.isArray(cloud.tasks) && cloud.tasks.length > 0) {
-      const localStamp = localStorage.getItem('sqb_last_admin_update') || '';
+      const localStamp = getStoredLastModified();
       const cloudStamp = cloud.lastModifiedAt || '';
-      if (!localStorage.getItem('sqb_local_tasks') || cloudStamp >= localStamp) {
-        localStorage.setItem('sqb_local_tasks', JSON.stringify(cloud.tasks));
+      const prevTasksJson = localStorage.getItem('sqb_local_tasks') || '';
+      const nextTasksJson = JSON.stringify(cloud.tasks);
+
+      // Для обычных пользователей облачная версия от администратора ВСЕГДА является единственным источником истины.
+      // Для администратора облачная версия применяется, если нет несохранённых локальных правок.
+      const shouldAdoptCloudTasks =
+        !isCurrentUserAdmin() ||
+        (!state.hasUnsavedChanges && (!prevTasksJson || !localStamp || cloudStamp >= localStamp));
+
+      if (shouldAdoptCloudTasks) {
+        if (prevTasksJson !== nextTasksJson || (cloudStamp && cloudStamp !== localStamp)) {
+          tasksUpdated = true;
+        }
+        localStorage.setItem('sqb_local_tasks', nextTasksJson);
         if (cloudStamp) {
           localStorage.setItem('sqb_last_admin_update', cloudStamp);
           state.lastModifiedAt = cloudStamp;
         }
       }
     }
+
+    return { updated: tasksUpdated };
   } catch (_) {
     // При временном отсутствии интернета продолжаем работу с локальным кэшем
+    return { updated: false };
   }
 }
 
-// Отправка актуального состояния в облако после регистрации, входа или изменения задач администратором
-async function pushCloudState() {
+// Отправка актуального состояния в облако (задачи перезаписываются ТОЛЬКО при сохранении администратором)
+async function pushCloudState(options = { includeTasks: false }) {
   try {
+    let existingCloud = null;
+    try {
+      const getRes = await fetch(`${CLOUD_SYNC_URL}?t=${Date.now()}`, {
+        method: 'GET',
+        cache: 'no-store'
+      });
+      if (getRes.ok) {
+        existingCloud = await getRes.json().catch(() => null);
+      }
+    } catch (_) {
+      existingCloud = null;
+    }
+
+    const localUsers = JSON.parse(localStorage.getItem('sqb_local_users') || '[]');
+    const localHistory = JSON.parse(localStorage.getItem('sqb_local_login_history') || '[]');
+
+    const canPushTasks =
+      Boolean(options && options.includeTasks) ||
+      !existingCloud ||
+      !Array.isArray(existingCloud.tasks) ||
+      existingCloud.tasks.length === 0;
+
+    const tasksToSave = canPushTasks
+      ? JSON.parse(localStorage.getItem('sqb_local_tasks') || JSON.stringify(INITIAL_SEED_TASKS))
+      : existingCloud.tasks;
+
+    const stampToSave = canPushTasks
+      ? getStoredLastModified() || new Date().toISOString()
+      : existingCloud.lastModifiedAt || getStoredLastModified() || new Date().toISOString();
+
     const payload = {
-      users: JSON.parse(localStorage.getItem('sqb_local_users') || '[]'),
-      tasks: JSON.parse(localStorage.getItem('sqb_local_tasks') || JSON.stringify(INITIAL_SEED_TASKS)),
-      lastModifiedAt: getStoredLastModified(),
-      loginHistory: JSON.parse(localStorage.getItem('sqb_local_login_history') || '[]')
+      users: localUsers,
+      tasks: tasksToSave,
+      lastModifiedAt: stampToSave,
+      loginHistory: localHistory
     };
+
     await fetch(CLOUD_SYNC_URL, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -950,6 +1015,23 @@ async function pushCloudState() {
   } catch (_) {
     // Ошибка сети игнорируется, данные сохранены локально и отправятся при следующей синхронизации
   }
+}
+
+// Принудительное сохранение и публикация всех изменений администратором для всех пользователей на всех устройствах
+async function saveAllAdminChanges() {
+  if (!isCurrentUserAdmin()) return;
+  const nowIso = new Date().toISOString();
+  state.lastModifiedAt = nowIso;
+  localStorage.setItem('sqb_last_admin_update', nowIso);
+  if (Array.isArray(state.tasks) && state.tasks.length > 0) {
+    localStorage.setItem('sqb_local_tasks', JSON.stringify(state.tasks));
+  }
+  await pushCloudState({ includeTasks: true });
+  setUnsavedAdminIndicator(false);
+  renderDashboard();
+  renderTasksTable();
+  renderAdminTab();
+  showToast(t('toastAdminSavedAll'));
 }
 
 // Локальный и облачный обработчик API для работы с любого устройства (телефон, планшет, ноутбук) на GitHub Pages
@@ -1154,7 +1236,8 @@ async function localApiFallback(url, options = {}) {
       tasks.push(newTask);
       saveLocalTasks(tasks);
       localStorage.setItem('sqb_last_admin_update', nowIso);
-      await pushCloudState();
+      setUnsavedAdminIndicator(true);
+      await pushCloudState({ includeTasks: true });
       return { task: newTask, lastModifiedAt: nowIso };
     }
 
@@ -1167,7 +1250,8 @@ async function localApiFallback(url, options = {}) {
       tasks[idx].updated_at = nowIso;
       saveLocalTasks(tasks);
       localStorage.setItem('sqb_last_admin_update', nowIso);
-      await pushCloudState();
+      setUnsavedAdminIndicator(true);
+      await pushCloudState({ includeTasks: true });
       return { task: tasks[idx], lastModifiedAt: nowIso };
     }
 
@@ -1190,7 +1274,8 @@ async function localApiFallback(url, options = {}) {
       };
       saveLocalTasks(tasks);
       localStorage.setItem('sqb_last_admin_update', nowIso);
-      await pushCloudState();
+      setUnsavedAdminIndicator(true);
+      await pushCloudState({ includeTasks: true });
       return { task: tasks[idx], lastModifiedAt: nowIso };
     }
 
@@ -1199,7 +1284,8 @@ async function localApiFallback(url, options = {}) {
       const filtered = tasks.filter((t) => t.id !== Number(idParam));
       saveLocalTasks(filtered);
       localStorage.setItem('sqb_last_admin_update', nowIso);
-      await pushCloudState();
+      setUnsavedAdminIndicator(true);
+      await pushCloudState({ includeTasks: true });
       return { deletedId: Number(idParam), lastModifiedAt: nowIso };
     }
   }
@@ -1393,7 +1479,7 @@ function renderAiPipelineCell(task) {
 function renderDashboard() {
   const lastUpdatedEl = document.getElementById('last-updated-time');
   if (lastUpdatedEl) {
-    lastUpdatedEl.textContent = formatTashkentDateTime(state.lastModifiedAt);
+    lastUpdatedEl.textContent = formatTashkentDateTime(state.lastModifiedAt || new Date().toISOString());
   }
 
   const total = state.tasks.length;
@@ -1617,7 +1703,7 @@ function renderDashboard() {
 function renderAiDashboard() {
   const aiLastUpdatedEl = document.getElementById('ai-last-updated-time');
   if (aiLastUpdatedEl) {
-    aiLastUpdatedEl.textContent = formatTashkentDateTime(state.lastModifiedAt);
+    aiLastUpdatedEl.textContent = formatTashkentDateTime(state.lastModifiedAt || new Date().toISOString());
   }
 
   const aiTasks = state.tasks.filter((task) => resolveTaskAiStage(task) !== 'not_required');
@@ -1789,6 +1875,8 @@ function renderTasksTable() {
   const isAdmin = isCurrentUserAdmin();
   document.getElementById('th-actions').classList.toggle('hidden', !isAdmin);
   document.getElementById('add-task-btn').classList.toggle('hidden', !isAdmin);
+  const saveTasksBtn = document.getElementById('admin-save-tasks-btn');
+  if (saveTasksBtn) saveTasksBtn.classList.toggle('hidden', !isAdmin);
 
   const deptNames = I18N[state.lang].departments;
   const statusLabels = I18N[state.lang].statuses;
@@ -1999,6 +2087,14 @@ function updateAuthUI() {
   if (adminNavTab) {
     adminNavTab.classList.toggle('hidden', !isAdmin);
   }
+  const adminSaveTopBtn = document.getElementById('admin-save-top-btn');
+  if (adminSaveTopBtn) {
+    adminSaveTopBtn.classList.toggle('hidden', !isAdmin);
+  }
+  const adminSaveTasksBtn = document.getElementById('admin-save-tasks-btn');
+  if (adminSaveTasksBtn) {
+    adminSaveTasksBtn.classList.toggle('hidden', !isAdmin);
+  }
 
   if (isAdmin) {
     if (badgeBox) {
@@ -2155,6 +2251,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!el) return;
     el.addEventListener('input', renderTasksTable);
     el.addEventListener('change', renderTasksTable);
+  });
+
+  // Кнопки «💾 Сохранить изменения» для администратора (синхронизируют данные у всех пользователей на любых устройствах)
+  ['admin-save-top-btn', 'admin-save-tasks-btn', 'admin-save-panel-btn'].forEach((id) => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.addEventListener('click', saveAllAdminChanges);
+    }
   });
 
   // Кнопка создания задачи (доступна только администратору)
@@ -2316,4 +2420,33 @@ document.addEventListener('DOMContentLoaded', async () => {
   } else {
     updateAuthUI();
   }
+
+  // Фоновая автоматическая синхронизация на всех устройствах (телефон, планшет, ноутбук):
+  // как только администратор нажимает «💾 Сохранить изменения», данные автоматически обновляются у всех открытых пользователей
+  const syncFromCloudIfChanged = async () => {
+    if (!state.token || !state.user) return;
+    if (isCurrentUserAdmin() && state.hasUnsavedChanges) return;
+    const prevStamp = state.lastModifiedAt;
+    const prevTasksRaw = localStorage.getItem('sqb_local_tasks') || '';
+    const res = await pullCloudState();
+    const nextTasksRaw = localStorage.getItem('sqb_local_tasks') || '';
+    if (res.updated || state.lastModifiedAt !== prevStamp || nextTasksRaw !== prevTasksRaw) {
+      if (nextTasksRaw) {
+        try {
+          state.tasks = JSON.parse(nextTasksRaw);
+        } catch (_) {}
+      }
+      renderDashboard();
+      renderTasksTable();
+      renderAdminTab();
+    }
+  };
+
+  setInterval(syncFromCloudIfChanged, 6000);
+  window.addEventListener('focus', syncFromCloudIfChanged);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      syncFromCloudIfChanged();
+    }
+  });
 });
